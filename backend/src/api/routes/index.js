@@ -7,6 +7,8 @@
 
 import { Router } from "express";
 import { healthRouter } from "./health.routes.js";
+import { linkRouter } from "./link.routes.js";
+import { redirectRouter } from "./redirect.routes.js";
 
 export const router = Router();
 
@@ -14,7 +16,11 @@ export const router = Router();
 // orchestrators and Prometheus expect them at fixed, version-independent paths.
 router.use(healthRouter);
 
-// Phase 1+: router.use("/api/v1/links", linkRouter);
+router.use("/api/v1/links", linkRouter);
+
 // Phase 2+: router.use("/api/v1/auth", authRouter);
-// Phase 1+: router.use("/", redirectRouter);   // GET /:code
 // Phase 4+: router.use("/api/v1/analytics", analyticsRouter);
+
+// MUST be last: GET /:code is a single-segment catch-all that would shadow
+// any route registered after it (e.g. a future single-segment path).
+router.use(redirectRouter);

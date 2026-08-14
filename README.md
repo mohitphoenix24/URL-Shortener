@@ -73,6 +73,31 @@ npm install
 npm run dev
 ```
 
+## API quick reference (Phase 1)
+
+No auth yet (Phase 2) — every link created right now is anonymous.
+
+```bash
+# Create a short link
+curl -XPOST localhost:4500/api/v1/links \
+  -H 'content-type: application/json' \
+  -d '{"longUrl":"https://github.com/mohitphoenix24","title":"My GitHub"}'
+
+# Custom alias instead of an auto-generated code
+curl -XPOST localhost:4500/api/v1/links \
+  -H 'content-type: application/json' \
+  -d '{"longUrl":"https://anthropic.com","customAlias":"claude-code"}'
+
+# Unguessable random code instead of the default sequential one
+curl -XPOST "localhost:4500/api/v1/links?mode=random" \
+  -H 'content-type: application/json' -d '{"longUrl":"https://nodejs.org"}'
+
+curl -i localhost:4500/10000                        # follow the redirect
+curl "localhost:4500/api/v1/links?page=1&limit=20&sort=clickCount:desc&isActive=true"
+curl -XPATCH localhost:4500/api/v1/links/14776336 -H 'content-type: application/json' -d '{"isActive":false}'
+curl -XDELETE localhost:4500/api/v1/links/14776336   # soft delete
+```
+
 ## Verifying it's alive
 
 ```bash
@@ -95,7 +120,7 @@ Built in phases, each one committed working end-to-end. See
 [`docs/decisions.md`](docs/decisions.md) for the reasoning behind each major choice.
 
 - [x] Phase 0 — Foundation (env validation, logging, error handling, health checks, Docker infra)
-- [ ] Phase 1 — Core shortener (Base62, CRUD, redirect)
+- [x] Phase 1 — Core shortener (Base62, CRUD, redirect, SSRF guard)
 - [ ] Phase 2 — Auth & ownership (JWT rotation, RBAC)
 - [ ] Phase 3 — Redis cache-aside + hand-written rate limiter
 - [ ] Phase 4 — Click analytics

@@ -41,6 +41,17 @@ every async route handler to catch rejected promises. Express 5 forwards rejecte
 middleware automatically, which removes that wrapper entirely and is the direction the framework is
 moving. ESM was chosen alongside it as the deliberate, permanent move off `require()`.
 
+## `req.valid`, not overwriting `req.body`/`req.query`/`req.params`
+
+Discovered while testing Phase 1's first `POST /api/v1/links` call: Express 5 turned `req.query`
+into a getter-only property (re-derived from the URL on each access), so a validation middleware
+that reassigns it — the natural way to write "parse then replace" — throws
+`TypeError: Cannot set property query of #<IncomingMessage> which has only a getter`. Fixed by
+having `middleware/validate.js` write parsed/coerced output to `req.valid[source]` instead of
+overwriting the Express-owned property, for all three sources (`body`/`query`/`params`), for
+consistency even though only `query` strictly required it. Full writeup in
+`docs/system-design.md`.
+
 ## Testcontainers instead of a shared test database
 
 Integration tests spin up real, disposable Postgres and Redis containers per run rather than
