@@ -1,0 +1,46 @@
+name: url-shortener
+
+# Local dev infra: Postgres + Redis. The API runs on the host with `npm run dev`
+# during Phase 0-6 (fast reload). Phase 7 adds an `api` service here for the
+# fully containerised stack.
+#
+# Host ports are deliberately non-default (5435 / 6381) to avoid clashing with
+# other Postgres/Redis instances already running on this machine (aika-*, etc).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: url-shortener-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: url_shortener
+      POSTGRES_PASSWORD: url_shortener_dev_pw
+      POSTGRES_DB: url_shortener
+    ports:
+      - "5435:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U url_shortener -d url_shortener"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: url-shortener-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    ports:
+      - "6381:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pg_data:
+  redis_data:
