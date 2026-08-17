@@ -27,3 +27,18 @@ export function toLinkDto(row) {
     createdAt: row.created_at,
   };
 }
+
+/**
+ * @param {object} row - A raw row from the `users` table.
+ * @returns {object} The public API representation of a user — never
+ *   includes `password_hash`, which is the whole point of having this
+ *   function instead of returning the row directly.
+ */
+export function toUserDto(row) {
+  return {
+    id: row.id,
+    email: row.email,
+    role: row.role,
+    createdAt: row.created_at,
+  };
+}

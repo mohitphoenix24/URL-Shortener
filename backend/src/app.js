@@ -9,6 +9,7 @@ import express from "express";
 import helmet from "helmet";
 import cors from "cors";
 import compression from "compression";
+import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 
 import { env } from "./config/env.js";
@@ -28,6 +29,7 @@ app.use(helmet());
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
 app.use(compression());
 app.use(express.json({ limit: "16kb" })); // small: this API accepts URLs and short JSON bodies, not uploads
+app.use(cookieParser()); // reads the httpOnly refresh-token cookie — see api/controllers/auth.controller.js
 
 app.use(
   pinoHttp({

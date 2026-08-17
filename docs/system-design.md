@@ -83,6 +83,50 @@ getter`. Hit this directly while testing `POST /api/v1/links` and fixed it by ha
 the getter issue entirely and, as a side effect, keeps "what the client sent" cleanly separate from
 "what passed validation" for every request.
 
+## Auth session lifecycle
+
+```
+POST /auth/register or /auth/login
+  → 201/200, body: { user, accessToken }
+  → Set-Cookie: refreshToken=<jwt>; HttpOnly; SameSite=Lax; Path=/api/v1/auth
+
+Every subsequent request to a protected route:
+  → Authorization: Bearer <accessToken>
+  → requireAuth verifies the signature only (no DB hit) → req.user
+
+Access token expires (15m):
+  POST /auth/refresh  (browser sends the cookie automatically; curl/Postman may send
+                        { "refreshToken": "..." } in the body instead)
+    1. verify JWT signature + exp on the presented refresh token
+    2. SHA-256 it, look up the hash in refresh_tokens
+    3. not found            → 401 INVALID_REFRESH_TOKEN
+    4. found, revoked_at set → reuse detected: revoke EVERY token for this user, 401 REFRESH_TOKEN_REUSED
+    5. found, expired        → 401 REFRESH_TOKEN_EXPIRED
+    6. otherwise: revoke this row, issue + persist a brand new access+refresh pair
+  → new Set-Cookie with the rotated refresh token; body: { user, accessToken }
+
+POST /auth/logout
+  → revoke the presented token's row (idempotent — no error if already gone)
+  → clear the cookie
+```
+
+**Verified end-to-end by hand, including the failure paths** (the parts that are easy to get wrong
+and don't show up just from the happy path working):
+
+- Rotating a refresh token, then replaying the *old* one → `REFRESH_TOKEN_REUSED`, and the
+  legitimately-issued *new* token was also found revoked immediately after — confirming the "kill
+  every session" response actually fires, not just "reject this one request."
+- Capturing a raw refresh token before calling `/logout`, then presenting that captured token
+  afterward via the body (bypassing the cookie entirely) → still rejected. Proves revocation is
+  enforced server-side against the database, not merely by the browser discarding a cleared cookie.
+- Two accounts, cross-ownership: user B given user A's link id → `403 LINK_FORBIDDEN` on GET,
+  PATCH, and DELETE alike. An anonymous (`user_id IS NULL`) link produces the identical 403 for a
+  non-admin, non-owner caller — "unclaimed" is not "manageable by anyone."
+- Promoting a user to `admin` (directly via SQL — there's no self-service admin grant in this
+  phase) and re-logging-in to pick up the new role in a fresh access token: `GET /api/v1/links`
+  then returns every user's links unscoped, and a link a regular user gets 403 on is readable by
+  the admin.
+
 ## Estimation (rough, for context)
 
 Not a real capacity plan — a sanity check in the style of the roadmap's Level 11 walkthrough, to

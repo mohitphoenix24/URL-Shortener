@@ -32,8 +32,9 @@ One-way dependency, enforced by directory, not just convention:
 ## Request lifecycle
 
 Every request passes through, in order: `requestContext` (correlation ID) → `helmet`/`cors`/
-`compression` → JSON body parsing → `pino-http` access logging → HTTP metrics timer → the route
-tree → (on no match) `notFound` → `errorHandler`.
+`compression` → JSON body parsing → cookie parsing (reads the refresh-token cookie, if any) →
+`pino-http` access logging → HTTP metrics timer → the route tree → (on no match) `notFound` →
+`errorHandler`.
 
 Express 5's automatic forwarding of rejected promises to error middleware means a controller or
 service can simply `throw new AppError(...)` or let an `await` reject — no `try/catch` boilerplate,
@@ -46,6 +47,28 @@ call stack. It carries an HTTP status code and a stable machine-readable `code` 
 `errorHandler` middleware normalizes `AppError`, Zod validation errors, and Postgres unique-violation
 errors into the same JSON shape, and treats anything else as an unexpected 500 — logged with a full
 stack trace, never leaked to the client in production.
+
+## Authentication & authorization
+
+Two middleware, both in `src/middleware/auth.js`, both reading only the `Authorization: Bearer`
+header (never the refresh-token cookie — that's the auth controller's concern exclusively):
+
+- **`requireAuth`** — 401s if there's no valid access token; populates `req.user = {id, email,
+  role}` otherwise. Used on every link route except creation.
+- **`optionalAuth`** — populates `req.user` if a valid token is present, never rejects otherwise.
+  Used only on `POST /api/v1/links`, where anonymous creation is a supported case.
+- **`requireRole(...roles)`** — a factory for role-gated routes; not currently used anywhere (RBAC
+  in this app is expressed as data-scoping in `services/link.service.js` and
+  `api/controllers/link.controller.js` — see below — rather than route-level role gates), but
+  available for a future admin-only route.
+
+Authorization (as opposed to authentication) lives in the **service** layer, not middleware:
+`assertOwnerOrAdmin` in `services/link.service.js` is the single rule every read/update/delete of a
+link goes through. Route-level middleware only answers "who is this," never "are they allowed to
+touch this specific row" — that requires the row, which only the service has fetched.
+
+Full session-issuance design (token types, rotation, reuse detection, cookie vs. body) is in
+`docs/decisions.md` and `docs/system-design.md`.
 
 ## Observability
 

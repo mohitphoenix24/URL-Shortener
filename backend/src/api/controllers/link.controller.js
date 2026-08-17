@@ -1,10 +1,12 @@
 /**
  * @fileoverview HTTP-facing handlers for the links resource. Translate
  * `req` into plain service calls and shape the response — no SQL, no
- * business rules, no direct Postgres/Redis access. `req.user` (the
- * authenticated caller) doesn't exist yet — it's `undefined` until Phase 2
- * wires up auth middleware, which is why every link created right now is
- * anonymous (`userId` omitted).
+ * business rules, no direct Postgres/Redis access.
+ *
+ * `POST /` runs behind `optionalAuth` (anonymous creation is allowed,
+ * ownership is attributed if the caller happens to be logged in);
+ * every other route here runs behind `requireAuth`, so `req.user` is
+ * guaranteed present in all of them except `createLink`.
  * @author Mohit Sharma
  */
 
@@ -38,15 +40,17 @@ export async function createLink(req, res) {
 
 /**
  * GET /api/v1/links
- * Paginated, filterable, sortable list. Currently unscoped by owner — Phase
- * 2 will restrict this to `req.user.id`'s own links once auth exists.
+ * Paginated, filterable, sortable list, scoped to the caller's own links —
+ * except for admins, who see every link (RBAC: role changes the query, not
+ * just what actions are allowed).
  *
  * @param {import('express').Request} req
  * @param {import('express').Response} res
  * @returns {Promise<void>}
  */
 export async function listLinks(req, res) {
-  const result = await linkService.listLinks(req.valid.query, req.user?.id);
+  const ownerFilter = req.user.role === "admin" ? undefined : req.user.id;
+  const result = await linkService.listLinks(req.valid.query, ownerFilter);
   res.status(200).json(result);
 }
 
@@ -57,7 +61,7 @@ export async function listLinks(req, res) {
  * @returns {Promise<void>}
  */
 export async function getLink(req, res) {
-  const link = await linkService.getLinkById(req.valid.params.id);
+  const link = await linkService.getLinkById(req.valid.params.id, req.user);
   res.status(200).json({ data: link });
 }
 
@@ -68,7 +72,7 @@ export async function getLink(req, res) {
  * @returns {Promise<void>}
  */
 export async function updateLink(req, res) {
-  const link = await linkService.updateLink(req.valid.params.id, req.valid.body);
+  const link = await linkService.updateLink(req.valid.params.id, req.valid.body, req.user);
   res.status(200).json({ data: link });
 }
 
@@ -79,6 +83,6 @@ export async function updateLink(req, res) {
  * @returns {Promise<void>}
  */
 export async function deleteLink(req, res) {
-  await linkService.deleteLink(req.valid.params.id);
+  await linkService.deleteLink(req.valid.params.id, req.user);
   res.status(204).send();
 }

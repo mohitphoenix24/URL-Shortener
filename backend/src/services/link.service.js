@@ -26,6 +26,26 @@ function isUniqueViolation(err) {
 }
 
 /**
+ * Enforces ownership for read/update/delete of a single link: admins may
+ * touch anything; a regular user may only touch a link where
+ * `link.user_id` matches their own id. An anonymous (unclaimed, `user_id
+ * IS NULL`) link belongs to nobody in particular, so — same as a link
+ * owned by someone else — only an admin can manage it. This single rule is
+ * what "links scoped to owner" means in practice everywhere below.
+ *
+ * @param {object} linkRow - Raw `links` table row.
+ * @param {{id: string, role: string}} user - The authenticated caller (always present — every
+ *   route that calls this runs behind `requireAuth`).
+ * @returns {void}
+ * @throws {AppError} 403 if the caller isn't the owner or an admin.
+ */
+function assertOwnerOrAdmin(linkRow, user) {
+  if (user.role === "admin") return;
+  if (linkRow.user_id !== null && String(linkRow.user_id) === String(user.id)) return;
+  throw AppError.forbidden("You do not have permission to access this link", "LINK_FORBIDDEN");
+}
+
+/**
  * Creates a new short link. Three code-generation strategies, in priority
  * order:
  *
@@ -43,7 +63,7 @@ function isUniqueViolation(err) {
  * @param {string} [input.customAlias]
  * @param {string} [input.title]
  * @param {Date} [input.expiresAt]
- * @param {bigint} [input.userId] - Owner, if the request was authenticated. Anonymous otherwise.
+ * @param {string} [input.userId] - Owner id (from the access token's `sub` claim), if the request was authenticated. Anonymous otherwise.
  * @returns {Promise<object>} The created link, API-shaped.
  * @throws {AppError} 422 for an unsafe/malformed `longUrl`, 409 if `customAlias` is taken or reserved.
  */
@@ -115,7 +135,7 @@ export async function resolveLink(shortCode) {
 /**
  * @async
  * @param {object} query - Already-validated query params (see `listLinksQuerySchema`).
- * @param {bigint} [ownerUserId] - When provided, restricts results to this owner.
+ * @param {string} [ownerUserId] - When provided, restricts results to this owner (omitted → unscoped, used for an admin's "all links" view).
  * @returns {Promise<{data: object[], pagination: object}>}
  */
 export async function listLinks(query, ownerUserId) {
@@ -138,35 +158,53 @@ export async function listLinks(query, ownerUserId) {
 /**
  * @async
  * @param {bigint} id
+ * @param {{id: string, role: string}} user
  * @returns {Promise<object>} The link, API-shaped.
- * @throws {AppError} 404 if not found or soft-deleted.
+ * @throws {AppError} 404 if not found or soft-deleted, 403 if not the owner or an admin.
  */
-export async function getLinkById(id) {
+export async function getLinkById(id, user) {
   const row = await linkRepository.findById(id);
   if (!row) throw AppError.notFound("Link not found", "LINK_NOT_FOUND");
+  assertOwnerOrAdmin(row, user);
   return toLinkDto(row);
 }
 
 /**
+ * Fetches the link first so ownership can be checked before the mutation —
+ * one extra SELECT versus folding `user_id = $n` into the UPDATE's WHERE
+ * clause directly. The combined-WHERE version would close a theoretical
+ * (and here harmless) TOCTOU gap between the check and the write; this
+ * version keeps the ownership rule as one explicit, readable statement
+ * shared by get/update/delete instead of duplicated across three SQL
+ * strings. A deliberate readability-over-micro-optimization tradeoff.
+ *
  * @async
  * @param {bigint} id
  * @param {{title?: string | null, expiresAt?: Date | null, isActive?: boolean}} fields
+ * @param {{id: string, role: string}} user
  * @returns {Promise<object>} The updated link, API-shaped.
- * @throws {AppError} 404 if not found or soft-deleted.
+ * @throws {AppError} 404 if not found or soft-deleted, 403 if not the owner or an admin.
  */
-export async function updateLink(id, fields) {
+export async function updateLink(id, fields, user) {
+  const existing = await linkRepository.findById(id);
+  if (!existing) throw AppError.notFound("Link not found", "LINK_NOT_FOUND");
+  assertOwnerOrAdmin(existing, user);
+
   const row = await linkRepository.updateById(id, fields);
-  if (!row) throw AppError.notFound("Link not found", "LINK_NOT_FOUND");
   return toLinkDto(row);
 }
 
 /**
  * @async
  * @param {bigint} id
+ * @param {{id: string, role: string}} user
  * @returns {Promise<void>}
- * @throws {AppError} 404 if not found or already deleted.
+ * @throws {AppError} 404 if not found or already deleted, 403 if not the owner or an admin.
  */
-export async function deleteLink(id) {
-  const deleted = await linkRepository.softDeleteById(id);
-  if (!deleted) throw AppError.notFound("Link not found", "LINK_NOT_FOUND");
+export async function deleteLink(id, user) {
+  const existing = await linkRepository.findById(id);
+  if (!existing) throw AppError.notFound("Link not found", "LINK_NOT_FOUND");
+  assertOwnerOrAdmin(existing, user);
+
+  await linkRepository.softDeleteById(id);
 }

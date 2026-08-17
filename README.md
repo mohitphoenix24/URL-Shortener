@@ -74,29 +74,52 @@ npm install
 npm run dev      # → http://localhost:5175
 ```
 
-## API quick reference (Phase 1)
+## API quick reference
 
-No auth yet (Phase 2) — every link created right now is anonymous.
+### Auth (Phase 2)
 
 ```bash
-# Create a short link
+# Register (also logs you in) — sets an httpOnly refresh-token cookie, returns an access token
+curl -c cookies.txt -XPOST localhost:4500/api/v1/auth/register \
+  -H 'content-type: application/json' -d '{"email":"you@example.com","password":"password123"}'
+
+curl -c cookies.txt -XPOST localhost:4500/api/v1/auth/login \
+  -H 'content-type: application/json' -d '{"email":"you@example.com","password":"password123"}'
+
+# Rotate: old refresh token is invalidated, a new access+refresh pair is issued
+curl -b cookies.txt -c cookies.txt -XPOST localhost:4500/api/v1/auth/refresh
+
+curl -XPOST localhost:4500/api/v1/auth/me -H "Authorization: Bearer $ACCESS_TOKEN"
+curl -b cookies.txt -XPOST localhost:4500/api/v1/auth/logout
+```
+
+### Links (Phase 1 core, now owner-scoped)
+
+`POST /links` still allows anonymous creation (unclaimed — `userId: null`); every other links
+route now requires `Authorization: Bearer <accessToken>`, and `GET/PATCH/DELETE /:id` are
+owner-scoped (403 for anyone else, admin excepted). The redirect itself (`GET /:code`) stays fully
+public — that has to work for anyone clicking a shared link.
+
+```bash
 curl -XPOST localhost:4500/api/v1/links \
-  -H 'content-type: application/json' \
+  -H "Authorization: Bearer $ACCESS_TOKEN" -H 'content-type: application/json' \
   -d '{"longUrl":"https://github.com/mohitphoenix24","title":"My GitHub"}'
 
 # Custom alias instead of an auto-generated code
 curl -XPOST localhost:4500/api/v1/links \
-  -H 'content-type: application/json' \
+  -H "Authorization: Bearer $ACCESS_TOKEN" -H 'content-type: application/json' \
   -d '{"longUrl":"https://anthropic.com","customAlias":"claude-code"}'
 
 # Unguessable random code instead of the default sequential one
 curl -XPOST "localhost:4500/api/v1/links?mode=random" \
-  -H 'content-type: application/json' -d '{"longUrl":"https://nodejs.org"}'
+  -H "Authorization: Bearer $ACCESS_TOKEN" -H 'content-type: application/json' -d '{"longUrl":"https://nodejs.org"}'
 
-curl -i localhost:4500/10000                        # follow the redirect
-curl "localhost:4500/api/v1/links?page=1&limit=20&sort=clickCount:desc&isActive=true"
-curl -XPATCH localhost:4500/api/v1/links/14776336 -H 'content-type: application/json' -d '{"isActive":false}'
-curl -XDELETE localhost:4500/api/v1/links/14776336   # soft delete
+curl -i localhost:4500/10000                        # follow the redirect — no auth needed
+curl "localhost:4500/api/v1/links?page=1&limit=20&sort=clickCount:desc&isActive=true" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+curl -XPATCH localhost:4500/api/v1/links/14776336 -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H 'content-type: application/json' -d '{"isActive":false}'
+curl -XDELETE localhost:4500/api/v1/links/14776336 -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
 ## Frontend (basic UI, functional test harness)
