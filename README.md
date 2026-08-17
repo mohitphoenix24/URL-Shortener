@@ -126,9 +126,16 @@ curl -XDELETE localhost:4500/api/v1/links/14776336 -H "Authorization: Bearer $AC
 
 Bitly-style: one hero input to shorten a URL, a result card with copy-to-clipboard, and a
 management table below (search, filter by status, sort, paginate, toggle active, delete) that
-exercises every `/api/v1/links` endpoint. No auth UI yet — that's added alongside Phase 2's backend
-auth. Deliberately basic design for now, revisited later; see
+exercises every `/api/v1/links` endpoint. Deliberately basic design for now, revisited later; see
 [`frontend/src/App.jsx`](frontend/src/App.jsx) for the whole flow in one place.
+
+**Auth (Phase 2):** a combined login/register panel replaces the links table for a logged-out
+visitor; the shorten form itself still works either way (anonymous creation is a supported
+backend case). A session survives a page reload via the httpOnly refresh cookie — no login
+prompt flashes on refresh — and the access token is held only in memory (a JS closure in
+`api/client.js`, never `localStorage`), re-attached to every request automatically. See
+[`docs/decisions.md`](docs/decisions.md) for a real concurrency bug this surfaced (and fixed) in
+the refresh flow.
 
 ## Verifying it's alive
 
@@ -154,12 +161,13 @@ Built in phases, each one committed working end-to-end. See
 - [x] Phase 0 — Foundation (env validation, logging, error handling, health checks, Docker infra)
 - [x] Phase 1 — Core shortener (Base62, CRUD, redirect, SSRF guard)
 - [x] Phase 1 UI — basic React/Vite frontend covering everything Phase 1 exposes (pulled forward
-      from Phase 6; auth UI still lands with Phase 2)
-- [ ] Phase 2 — Auth & ownership (JWT rotation, RBAC)
+      from Phase 6)
+- [x] Phase 2 — Auth & ownership (JWT rotation + reuse detection, RBAC) + frontend login/register,
+      session persistence across reload
 - [ ] Phase 3 — Redis cache-aside + hand-written rate limiter
 - [ ] Phase 4 — Click analytics
 - [ ] Phase 5 — Tests & API docs (OpenAPI/Swagger, Postman)
-- [ ] Phase 6 — Frontend polish pass (real design, auth screens)
+- [ ] Phase 6 — Frontend polish pass (real design)
 - [ ] Phase 7 — Docker & CI/CD
 - [ ] Phase 8 — Observability (Prometheus/Grafana) & deploy
 

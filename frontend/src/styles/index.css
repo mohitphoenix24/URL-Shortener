@@ -72,6 +72,32 @@ body {
 .header__tagline {
   color: var(--color-text-muted);
   font-size: 13px;
+  flex: 1;
+}
+
+.header__auth {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header__user {
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header__user--anon {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.header__role {
+  font-size: 10px;
+  text-transform: uppercase;
+  padding: 2px 8px;
 }
 
 /* ---------- Layout ---------- */
@@ -376,6 +402,60 @@ body {
 
 .link-filters__search {
   width: 200px;
+}
+
+/* ---------- Auth panel ---------- */
+
+.auth-panel {
+  max-width: 340px;
+  margin: 8px auto;
+  text-align: center;
+  padding: 8px 0 24px;
+}
+
+.auth-panel__title {
+  font-size: 18px;
+  margin: 0 0 6px;
+}
+
+.auth-panel__subtitle {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0 0 20px;
+  line-height: 1.5;
+}
+
+.auth-panel__form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+}
+
+.auth-panel__form .field input {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--color-surface);
+}
+
+.auth-panel__form .btn {
+  margin-top: 4px;
+}
+
+.auth-panel__toggle {
+  margin-top: 16px;
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auth-panel__toggle:hover {
+  text-decoration: underline;
 }
 
 /* ---------- Table ---------- */

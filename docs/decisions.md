@@ -97,6 +97,32 @@ account, not just reject the one request — verified directly in testing: after
 rotation, replaying the old token correctly triggered `REFRESH_TOKEN_REUSED`, and the token from
 the legitimate rotation was found revoked too, exactly as the "kill everything" response predicts.
 
+## A real concurrent-refresh bug, caught by testing the actual browser reload — not theorized
+
+Single-use refresh rotation (above) has a sharp edge on the client: if two requests to
+`/auth/refresh` ever fire concurrently with the same cookie, the first rotates it and succeeds, the
+second presents an already-rotated token and trips reuse detection — which revokes *every* session,
+including the one the first call just legitimately created. This was designed against from the
+start in `frontend/src/api/client.js`'s response interceptor (a shared in-flight promise so
+concurrent 401s all await one refresh call, not one each).
+
+What wasn't anticipated: `AuthContext`'s own startup effect — "try to silently restore a session
+from the cookie on page load" — called the refresh endpoint *directly*, bypassing that same guard
+entirely. React 19's `StrictMode` double-invokes effects in development specifically to surface
+exactly this class of bug, and it did: reloading the page while logged in fired two real concurrent
+`/auth/refresh` requests with the identical cookie, confirmed in the backend logs — one `200`, one
+`401 REFRESH_TOKEN_REUSED` — and the session that had just been restored was immediately killed
+again as a side effect. The page hung on "Checking session…" during Playwright verification, never
+resolved either state.
+
+This wasn't something a code review would have caught by inspection — the interceptor's dedup guard
+*looked* like it covered "the refresh call," and it did, for the one call site that used it. The
+bug was two call sites, only one deduplicated. Fixed by making `refreshSession()` in `client.js` the
+single function anywhere in the frontend allowed to hit the endpoint — `api/auth.js`'s `refresh()`
+now delegates to it instead of calling the endpoint itself, so there's structurally one dedup point
+regardless of who's asking. Re-verified the same reload scenario afterward: session restores
+cleanly, table populates, zero errors.
+
 ## Refresh token in an httpOnly cookie; access token in the JSON body
 
 The refresh token never appears anywhere client-side JavaScript can read it — an XSS payload can't
