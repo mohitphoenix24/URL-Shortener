@@ -76,6 +76,27 @@ composing two independently-designed button classes. Lesson: for UI work, "the t
 own engineering guidelines call that out explicitly, and this is exactly the failure mode they're
 about.
 
+## Links table overflow: reported by the user, first fix was wrong, second fix addressed the cause
+
+Flagged directly ("delete button is going out, look at it") with a screenshot showing the Delete
+button and part of the Actions column bleeding past the card's right edge on a real desktop
+browser. Root cause: the links table has seven columns — one holding full destination URLs — and
+`.app__main`'s `max-width: 960px` simply didn't leave the card enough room for all of them at their
+natural width.
+
+The first fix was wrong in a way worth recording: wrapping the table in an `overflow-x: auto`
+container with a `min-width` on the table stopped the *visual bleed*, but the `min-width` forced
+horizontal scrolling even though scrolling was never the point — it just moved the Actions column
+(Delete button, active toggle) behind an undiscoverable scrollbar instead of past the card edge.
+Re-measuring after that "fix" (screenshot + a bounding-box check, not just eyeballing it) showed
+the button was still effectively unreachable, just differently broken. The actual fix was to widen
+`.app__main` to 1140px so the table fits without scrolling at all on an ordinary desktop viewport,
+and keep the `overflow-x: auto` wrapper only as a fallback for genuinely narrow (mobile) viewports
+— verified separately at 375px, where it correctly does scroll. Lesson: a fix that makes the
+symptom stop being *visible* isn't the same as a fix that makes the underlying layout correct —
+re-verify the actual thing the user complained about (can they click Delete?), not just that the
+screenshot looks different.
+
 ## Hybrid JWT: stateless access token, stateful-revocable refresh token
 
 The roadmap frames "Stateful Sessions vs Stateless JWT" as a choice, but production systems that

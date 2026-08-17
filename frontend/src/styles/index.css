@@ -103,7 +103,11 @@ body {
 /* ---------- Layout ---------- */
 
 .app__main {
-  max-width: 960px;
+  /* Wide enough that the 7-column links table (short link, destination,
+     clicks, status, created, expires, actions) fits without scrolling on
+     an ordinary desktop viewport. The hero/shorten form isn't affected —
+     it has its own 640px max-width and stays centered regardless. */
+  max-width: 1140px;
   width: 100%;
   margin: 0 auto;
   padding: 48px 24px 80px;
@@ -460,6 +464,18 @@ body {
 
 /* ---------- Table ---------- */
 
+/* Fallback safety net, not the primary fix: `.app__main`'s max-width is
+   sized so this table fits without scrolling on an ordinary desktop
+   viewport. This wrapper only kicks in on narrower viewports where it
+   genuinely can't — scrolling a table beats it silently overflowing past
+   the card's padding (or, worse, being clipped with no way to reach it —
+   the first version of this fix used a `min-width` that forced scrolling
+   even when there was room, which hid the Actions column behind an
+   undiscoverable scrollbar. That was a worse bug than the one it fixed). */
+.links-table__wrapper {
+  overflow-x: auto;
+}
+
 .links-table {
   width: 100%;
   border-collapse: collapse;
@@ -684,10 +700,5 @@ body {
 
   .link-filters__search {
     width: 100%;
-  }
-
-  .links-table {
-    display: block;
-    overflow-x: auto;
   }
 }
