@@ -1,0 +1,613 @@
+/*
+ * Base styles for the URL Shortener test harness.
+ * Deliberately basic — function over polish, per the project's own scope
+ * (Phase 1 goal is proving the API works, not a design pass). A Bitly-ish
+ * orange-accent, pill-input hero layout stands in for a real design system
+ * until that gets revisited later.
+ * Author: Mohit Sharma
+ */
+
+:root {
+  --color-bg: #f7f8fa;
+  --color-surface: #ffffff;
+  --color-text: #1a1d29;
+  --color-text-muted: #6b7280;
+  --color-border: #e5e7eb;
+  --color-primary: #ee6123;
+  --color-primary-hover: #d6531a;
+  --color-success: #16a34a;
+  --color-success-bg: #ecfdf3;
+  --color-danger: #dc2626;
+  --color-danger-bg: #fef2f2;
+  --color-muted-bg: #f1f2f4;
+  --radius: 10px;
+  --radius-pill: 999px;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 4px 16px rgba(16, 24, 40, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- Header ---------- */
+
+.header {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.header__inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px 24px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.header__logo {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.header__logo-accent {
+  color: var(--color-primary);
+}
+
+.header__tagline {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+/* ---------- Layout ---------- */
+
+.app__main {
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+
+/* ---------- Hero / shorten form ---------- */
+
+.hero {
+  text-align: center;
+}
+
+.hero__title {
+  font-size: 34px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  letter-spacing: -0.02em;
+}
+
+.hero__subtitle {
+  color: var(--color-text-muted);
+  margin: 0 0 28px;
+  font-size: 15px;
+}
+
+.shorten-form {
+  max-width: 640px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.shorten-form__main {
+  display: flex;
+  gap: 10px;
+}
+
+.shorten-form__input {
+  flex: 1;
+  padding: 14px 20px;
+  font-size: 15px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  outline: none;
+}
+
+.shorten-form__input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(238, 97, 35, 0.12);
+}
+
+.shorten-form__advanced-toggle {
+  margin-top: 12px;
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.shorten-form__advanced-toggle:hover {
+  text-decoration: underline;
+}
+
+.shorten-form__advanced {
+  margin-top: 12px;
+  padding: 20px;
+  background: var(--color-muted-bg);
+  border-radius: var(--radius);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.field__label {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.field input[type="text"],
+.field input[type="datetime-local"] {
+  padding: 9px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--color-surface);
+}
+
+.field--checkbox {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  padding: 12px 24px;
+  border-radius: var(--radius-pill);
+  border: none;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn--primary {
+  background: var(--color-primary);
+  color: white;
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.btn--ghost {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background: var(--color-muted-bg);
+}
+
+.btn--danger-ghost {
+  background: transparent;
+  border: none;
+  color: var(--color-danger);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.btn--danger-ghost:hover:not(:disabled) {
+  background: var(--color-danger-bg);
+  border-radius: 6px;
+}
+
+/*
+ * `.copy-btn` always declares every property it needs (including `color`),
+ * even ones that look like they'd inherit fine — so it renders correctly on
+ * its own AND when combined with an unrelated class like `.btn--primary`
+ * (see `.copy-btn--primary` below). Two classes on one element both
+ * declaring `background` but only one declaring `color` is exactly how the
+ * ResultCard's copy button once ended up as invisible white-on-white text:
+ * source order let `.copy-btn`'s white background win while `.btn--primary`'s
+ * white text color had nothing competing with it. Self-contained rules make
+ * that class of bug structurally impossible.
+ */
+.copy-btn {
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.copy-btn:hover {
+  background: var(--color-muted-bg);
+}
+
+.copy-btn--inline {
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+/* Filled variant for the ResultCard, where the copy button is the primary action. */
+.copy-btn--primary {
+  border: none;
+  background: var(--color-primary);
+  color: white;
+}
+
+.copy-btn--primary:hover {
+  background: var(--color-primary-hover);
+}
+
+/* ---------- Result card ---------- */
+
+.result-card {
+  max-width: 640px;
+  margin: 20px auto 0;
+  padding: 18px 22px;
+  background: var(--color-success-bg);
+  border: 1px solid rgba(22, 163, 74, 0.25);
+  border-radius: var(--radius);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  text-align: left;
+}
+
+.result-card__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.result-card__label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-success);
+  font-weight: 700;
+}
+
+.result-card__url {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.result-card__url:hover {
+  text-decoration: underline;
+}
+
+.result-card__original {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ---------- Links section ---------- */
+
+.links-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 24px;
+}
+
+.links-section__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.links-section__header h2 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.link-filters {
+  display: flex;
+  gap: 8px;
+}
+
+.link-filters__search,
+.link-filters select {
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--color-surface);
+}
+
+.link-filters__search {
+  width: 200px;
+}
+
+/* ---------- Table ---------- */
+
+.links-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.links-table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.links-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.link-row:hover {
+  background: var(--color-muted-bg);
+}
+
+.link-row--busy {
+  opacity: 0.5;
+}
+
+.link-row__short {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.link-row__short a {
+  font-weight: 700;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.link-row__short a:hover {
+  text-decoration: underline;
+}
+
+.link-row__title {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.link-row__long {
+  color: var(--color-text-muted);
+}
+
+.link-row__clicks {
+  font-weight: 700;
+  text-align: center;
+}
+
+.link-row__date {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.link-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.links-table__empty {
+  text-align: center;
+  padding: 48px 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+/* ---------- Badges ---------- */
+
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge--active {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.badge--disabled {
+  background: var(--color-muted-bg);
+  color: var(--color-text-muted);
+}
+
+.badge--expired {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+/* ---------- Switch toggle ---------- */
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch__track {
+  position: absolute;
+  inset: 0;
+  background: var(--color-border);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.switch__track::before {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 2px;
+  top: 2px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.15s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.switch input:checked + .switch__track {
+  background: var(--color-success);
+}
+
+.switch input:checked + .switch__track::before {
+  transform: translateX(16px);
+}
+
+/* ---------- Pagination ---------- */
+
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.pagination__summary {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.pagination__controls {
+  display: flex;
+  gap: 8px;
+}
+
+/* ---------- Toasts ---------- */
+
+.toast-stack {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 100;
+}
+
+.toast {
+  padding: 12px 18px;
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
+  font-size: 14px;
+  font-weight: 500;
+  max-width: 360px;
+}
+
+.toast--success {
+  background: var(--color-text);
+  color: white;
+}
+
+.toast--error {
+  background: var(--color-danger);
+  color: white;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 640px) {
+  .shorten-form__main {
+    flex-direction: column;
+  }
+
+  .shorten-form__advanced {
+    grid-template-columns: 1fr;
+  }
+
+  .links-section__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .link-filters {
+    flex-direction: column;
+  }
+
+  .link-filters__search {
+    width: 100%;
+  }
+
+  .links-table {
+    display: block;
+    overflow-x: auto;
+  }
+}

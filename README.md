@@ -67,10 +67,11 @@ npm install
 npm run migrate:up
 npm run dev
 
-# 3. Frontend (once Phase 6 lands)
+# 3. Frontend
 cd ../frontend
+cp .env.example .env
 npm install
-npm run dev
+npm run dev      # → http://localhost:5175
 ```
 
 ## API quick reference (Phase 1)
@@ -98,6 +99,14 @@ curl -XPATCH localhost:4500/api/v1/links/14776336 -H 'content-type: application/
 curl -XDELETE localhost:4500/api/v1/links/14776336   # soft delete
 ```
 
+## Frontend (basic UI, functional test harness)
+
+Bitly-style: one hero input to shorten a URL, a result card with copy-to-clipboard, and a
+management table below (search, filter by status, sort, paginate, toggle active, delete) that
+exercises every `/api/v1/links` endpoint. No auth UI yet — that's added alongside Phase 2's backend
+auth. Deliberately basic design for now, revisited later; see
+[`frontend/src/App.jsx`](frontend/src/App.jsx) for the whole flow in one place.
+
 ## Verifying it's alive
 
 ```bash
@@ -121,11 +130,13 @@ Built in phases, each one committed working end-to-end. See
 
 - [x] Phase 0 — Foundation (env validation, logging, error handling, health checks, Docker infra)
 - [x] Phase 1 — Core shortener (Base62, CRUD, redirect, SSRF guard)
+- [x] Phase 1 UI — basic React/Vite frontend covering everything Phase 1 exposes (pulled forward
+      from Phase 6; auth UI still lands with Phase 2)
 - [ ] Phase 2 — Auth & ownership (JWT rotation, RBAC)
 - [ ] Phase 3 — Redis cache-aside + hand-written rate limiter
 - [ ] Phase 4 — Click analytics
 - [ ] Phase 5 — Tests & API docs (OpenAPI/Swagger, Postman)
-- [ ] Phase 6 — Frontend test harness
+- [ ] Phase 6 — Frontend polish pass (real design, auth screens)
 - [ ] Phase 7 — Docker & CI/CD
 - [ ] Phase 8 — Observability (Prometheus/Grafana) & deploy
 

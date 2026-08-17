@@ -52,6 +52,30 @@ overwriting the Express-owned property, for all three sources (`body`/`query`/`p
 consistency even though only `query` strictly required it. Full writeup in
 `docs/system-design.md`.
 
+## Frontend pulled forward from Phase 6 to Phase 1
+
+The original plan built the frontend last (Phase 6), after auth/caching/analytics existed
+server-side. In practice, testing a backend by hand with curl/Postman for five more phases is
+worse than having a real UI to click through immediately — so a basic version was built right
+after Phase 1 instead, covering only what Phase 1 exposes (no login, since there's nothing to log
+into yet). It gets extended, not rebuilt, once Phase 2 adds auth and later phases add analytics.
+
+## CSS class composition caught by actually looking at a screenshot
+
+`ResultCard`'s copy button (`<CopyButton className="btn btn--primary" />`, combined with the
+component's own `.copy-btn` class) rendered as **white text on a white background** — invisible,
+but the element was there, correctly wired, and every functional test passed. Both `.copy-btn` and
+`.btn--primary` declare `background`; same specificity, so the one later in the stylesheet
+(`.copy-btn`, white) won — but only `.btn--primary` declares `color` (white), so nothing overrode
+that. The bug was invisible to curl-based testing, invisible to "the button exists and is
+clickable" checks, and only showed up by rendering the page in a real (headless) browser and
+looking at the screenshot. Fixed by making `.copy-btn` declare every property it needs, including
+ones that look redundant, and adding a dedicated `.copy-btn--primary` modifier instead of
+composing two independently-designed button classes. Lesson: for UI work, "the test passed" and
+"a human looking at a screenshot would notice something's wrong" are different bars — this repo's
+own engineering guidelines call that out explicitly, and this is exactly the failure mode they're
+about.
+
 ## Testcontainers instead of a shared test database
 
 Integration tests spin up real, disposable Postgres and Redis containers per run rather than
