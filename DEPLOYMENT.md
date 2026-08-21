@@ -29,14 +29,15 @@ need to scale past what a PaaS offers — neither applies here.
   static hosting, not the `frontend/Dockerfile` — that Dockerfile still exists for the local
   `docker compose --profile full` path, see the main README).
 
-Plans are set to `starter` (paid), not `free` — Render's **free Postgres is deleted 30 days after
-creation**, which makes it a poor fit for anything meant to stay up as a live portfolio piece rather
-than a short-lived demo. If you want to try the whole thing cheaply first, you can lower any `plan:`
-in `render.yaml` to `free` and upgrade later — just know free Postgres has that 30-day clock,
-free web services spin down after 15 minutes idle (a real user's first request after that eats a
-cold-start delay), and free Key Value doesn't persist to disk on restart. That last one is actually
-fine for this app specifically — the cache and rate limiter both fail open by design (see
-`docs/decisions.md`), so a wiped Redis on restart is never a correctness problem, just a cold cache.
+Plans are set to `free` across the board, so deploying needs no payment info. That comes with two
+real tradeoffs: Render's **free Postgres is deleted 30 days after creation**, and the free API web
+service **spins down after 15 minutes idle** (the next request eats a cold-start delay). If this
+starts being a live portfolio piece rather than a short-lived demo, raise `url-shortener-db`'s and
+`url-shortener-api`'s `plan:` to `starter` in `render.yaml` before the 30-day Postgres clock runs
+out — Render will ask for a card at that point, but not before. Free Key Value not persisting to
+disk on restart is a non-issue here either way — the cache and rate limiter both fail open by
+design (see `docs/decisions.md`), so a wiped Redis on restart is never a correctness problem, just
+a cold cache.
 
 ## First-time setup
 

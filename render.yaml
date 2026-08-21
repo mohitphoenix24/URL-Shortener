@@ -5,20 +5,21 @@
 # blueprint sync, and migrations are run manually (see below for why) rather
 # than automatically on deploy.
 #
-# Plans are set to `starter` (paid), not `free`, on purpose: Render's free
-# Postgres is deleted 30 days after creation, which makes it unsuitable for
-# anything meant to stay up as a portfolio piece rather than a short-lived
-# demo. Free Key Value (Redis) has no such expiry and would actually work
-# fine given this app's fail-open design (a wiped cache/rate-limiter is
-# never a correctness problem here — see docs/decisions.md) — starter is
-# still the default below for consistency; switch `redis`'s plan to `free`
-# if you'd rather not pay for it.
+# Plans are set to `free`, not `starter` (paid), so the whole stack can be
+# deployed without entering payment info. Two real tradeoffs come with that:
+# Render's free Postgres is deleted 30 days after creation (re-provision and
+# re-run migrations when that happens, or upgrade `url-shortener-db`'s plan
+# to `starter` before the 30 days are up to keep the data), and the free web
+# service spins down after 15 minutes idle (a cold-start delay on the next
+# request). Free Key Value (Redis) has no expiry and is a good fit either
+# way — this app's cache/rate-limiter both fail open by design (a wiped
+# Redis is never a correctness problem — see docs/decisions.md).
 
 databases:
   - name: url-shortener-db
     databaseName: url_shortener
     user: url_shortener
-    plan: starter
+    plan: free
     postgresMajorVersion: "16"
 
 services:
@@ -34,7 +35,7 @@ services:
     # stage (used locally via docker-compose's `target: migrator`) simply
     # isn't reachable this way on Render — see DEPLOYMENT.md's migrations
     # section for the actual process instead of pretending this would work.
-    plan: starter
+    plan: free
     healthCheckPath: /healthz
     envVars:
       - key: NODE_ENV
@@ -83,7 +84,7 @@ services:
 
   - type: keyvalue
     name: url-shortener-redis
-    plan: starter
+    plan: free
     maxmemoryPolicy: allkeys-lru
     ipAllowList: []
 
