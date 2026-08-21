@@ -29,8 +29,6 @@ export function Header() {
           </svg>
           url<span className="header__logo-accent">.short</span>
         </span>
-        <span className="header__tagline">Backend test harness — every request here hits the real API</span>
-
         <div className="header__auth">
           {isAuthenticated ? (
             <>
