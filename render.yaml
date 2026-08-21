@@ -58,13 +58,16 @@ services:
       - key: APP_BASE_URL
         value: https://url-shortener-api-w46w.onrender.com
       # Render's `fromDatabase`/`fromService` property values are hostnames
-      # or connection strings, never a full https:// URL — CORS_ORIGIN needs
-      # the scheme, so this is written to match url-shortener-web's expected
-      # onrender.com URL below rather than derived. If you rename the
-      # `url-shortener-web` service or attach a custom domain, update this
-      # to match — verify after first deploy, don't assume it's right.
+      # or connection strings, never a full https:// URL, so this is a
+      # hardcoded literal like APP_BASE_URL above rather than derived.
+      # NOT "url-shortener-web.onrender.com" — that name was already taken
+      # by another Render account too, so the actual static site got a
+      # random suffix (url-shortener-web-5aym.onrender.com), checked
+      # directly in the dashboard. If you rename the `url-shortener-web`
+      # service or attach a custom domain, update this to match, or every
+      # browser request from the frontend will fail CORS.
       - key: CORS_ORIGIN
-        value: https://url-shortener-web.onrender.com
+        value: https://url-shortener-web-5aym.onrender.com
       - key: DATABASE_URL
         fromDatabase:
           name: url-shortener-db
