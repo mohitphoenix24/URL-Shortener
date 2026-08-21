@@ -191,6 +191,25 @@ running in production (kept as "Lax" for local development, where it
 already worked fine). "None" requires the cookie to also be marked
 "Secure" (HTTPS-only), which was already the case in production.
 
+### 15. Removing one line broke the header's layout
+
+Removing the leftover "test harness" tagline text from the header (issue
+13) had a side effect nobody noticed at the time: that piece of text was
+invisibly doing a second job — stretching to fill the middle of the header,
+which is what pushed everything after it (the login status, the theme
+toggle) over to the right edge. Once it was deleted, there was nothing left
+to do that stretching, so the remaining items collapsed to sit right next
+to the logo instead of spanning the header, leaving a large empty gap on
+the right. Reported directly as "the topbar looks unappealing."
+
+**Fix:** added the spacing rule directly to the login/logout button group
+instead of depending on the (now-removed) tagline to provide it as a side
+effect.
+
+**Lesson:** when removing an element for content reasons, check whether it
+was also doing invisible layout work (like acting as a flexible spacer)
+before assuming the removal is purely cosmetic.
+
 ---
 
 ## What this suggests going forward
