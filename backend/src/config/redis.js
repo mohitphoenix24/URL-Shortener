@@ -7,9 +7,14 @@
  * @author Mohit Sharma
  */
 
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 import Redis from "ioredis";
 import { env } from "./env.js";
 import { logger } from "./logger.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * Shared Redis connection.
@@ -18,6 +23,17 @@ import { logger } from "./logger.js";
 export const redis = new Redis(env.REDIS_URL, {
   maxRetriesPerRequest: 3,
   lazyConnect: false,
+});
+
+// Registers `redis.rateLimitTokenBucket(key, capacity, refillPerSec, nowMs,
+// requested)` as a first-class command. ioredis caches the script's SHA and
+// transparently falls back to EVAL (then re-caches) on a NOSCRIPT reply, so
+// callers never touch EVAL/EVALSHA directly. See scripts/rateLimit.lua for
+// why this needs to be one atomic server-side script rather than app-side
+// GET-then-SET.
+redis.defineCommand("rateLimitTokenBucket", {
+  numberOfKeys: 1,
+  lua: readFileSync(path.join(__dirname, "../../scripts/rateLimit.lua"), "utf8"),
 });
 
 redis.on("error", (err) => {

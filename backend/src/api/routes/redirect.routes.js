@@ -8,8 +8,9 @@
  */
 
 import { Router } from "express";
+import { rateLimitRedirect } from "../../middleware/rateLimit.js";
 import * as redirectController from "../controllers/redirect.controller.js";
 
 export const redirectRouter = Router();
 
-redirectRouter.get("/:code", redirectController.redirect);
+redirectRouter.get("/:code", rateLimitRedirect, redirectController.redirect);

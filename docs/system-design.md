@@ -37,25 +37,79 @@ already taken); the *next* successful link got `14776339`, leaving a permanent g
 This is expected, harmless (ids only need to be unique, not contiguous), and exactly what the code
 comment in `nextLinkId()` predicts.
 
-## Redirect hot path (current state — no cache yet)
+## Redirect hot path (Phase 3: Redis cache-aside)
 
 ```
 GET /:code
-  1. SELECT * FROM links WHERE short_code = $1 AND deleted_at IS NULL
-  2. 404 if no row (LINK_NOT_FOUND)
-  3. 410 if expires_at is in the past (LINK_EXPIRED)
-  4. 403 if is_active = false (LINK_DISABLED)
-  5. res.redirect(302, long_url)
+  1. MGET link:<code>, link:<code>:absent           (one round trip, both keys)
+  2. positive hit  → skip Postgres entirely, go to step 5
+  3. negative hit  → 404 (LINK_NOT_FOUND), skip Postgres entirely
+  4. miss both     → SELECT * FROM links WHERE short_code = $1 AND deleted_at IS NULL
+                      found    → SET link:<code> EX <jittered LINK_CACHE_TTL_SECONDS>
+                      not found → SET link:<code>:absent EX <jittered LINK_NEGATIVE_CACHE_TTL_SECONDS>, 404
+  5. 410 if expires_at is in the past (LINK_EXPIRED)      — re-checked against the clock on every
+  6. 403 if is_active = false (LINK_DISABLED)                call, cache hit or miss alike
+  7. res.redirect(302, long_url)
 ```
+
+See `services/link.service.js` (`resolveLink`, `getCacheEntries`, `cachePositive`, `cacheNegative`,
+`bustLinkCache`). Both TTLs are jittered (±10%, `utils/jitter.js`) so a burst of links cached around
+the same moment don't all expire in the same instant and stampede Postgres together. The negative
+cache exists specifically so a code that's typo'd or was never created doesn't cost a live query on
+every retry — its TTL is much shorter than the positive one precisely because a *false* negative
+(caused by racing a create against an in-flight lookup of the same code) is worse than a false
+positive would be; `createLink` also explicitly busts any stale negative entry for the code it just
+inserted, so that race self-heals immediately rather than waiting out the TTL.
+
+`updateLink`/`deleteLink` invalidate (not update-in-place) the positive cache entry for the affected
+code — simpler than keeping a cached payload in sync field-by-field, and the next redirect just
+repopulates it. `expires_at` is the one field that can't be invalidated proactively (nothing writes
+to it on a timer), so it's re-evaluated against the current clock on every resolution, cache hit or
+not — the cache only ever skips the Postgres round trip, never the expiry/disabled check itself.
+
+Redis being unreachable fails open at every step (`getCacheEntries`/`cachePositive`/`cacheNegative`/
+`bustLinkCache` all catch and log rather than throw) — caching is a performance optimization on this
+path, not a correctness dependency; a Redis outage degrades straight back to "every redirect hits
+Postgres directly," which was Phase 3's actual "before" state.
 
 **302, not 301, on purpose.** A permanent (301) redirect gets cached by browsers, which would let
 repeat visits skip this server entirely — breaking click analytics (Phase 4) before it's even built,
 and making a link's destination effectively immutable once a browser has cached it.
 
-Redis cache-aside (check cache → miss → query Postgres → populate cache with a jittered TTL →
-respond) is Phase 3. Right now every redirect is a live Postgres query — intentionally, so the
-"before" state is real and the Phase 3 write-up can show an honest before/after, not a
-hypothetical one.
+## Rate limiting (Phase 3: hand-written Redis token bucket)
+
+`scripts/rateLimit.lua`, wrapped by `middleware/rateLimit.js`. One Lua script evaluated atomically
+server-side (`EVALSHA`, via `ioredis`'s `defineCommand`) instead of an app-side GET-then-SET, which
+would race under concurrent requests for the same bucket: read-refill-consume-write happens as a
+single indivisible step, so two simultaneous requests can't both read the same "tokens remaining"
+value and both be admitted, letting the bucket go negative.
+
+Bucket state is a Redis hash (`tokens`, `updated_at_ms`) keyed by `ratelimit:{<bucketId>}`, refilled
+lazily on each check (`elapsed_ms / 1000 * refill_per_sec`, capped at `capacity`) rather than by a
+background job — no scheduler needed, and an idle bucket costs nothing until it's used again. Each
+key gets an `EXPIRE` long enough for a full refill from empty plus slack, so idle buckets don't live
+in Redis forever.
+
+Three tiers, each its own capacity/refill pair (`RATE_LIMIT_*` in `.env`):
+
+| Tier | Bucket key | Capacity | Refill/sec | Applied to |
+|---|---|---|---|---|
+| anon | `anon:<ip>` | 20 | 0.33 | `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`, anonymous `POST /links` |
+| auth | `user:<id>` | 100 | 1.5 | every `requireAuth` links route, `/auth/me` |
+| redirect | `redirect:<ip>` | 300 | 5 | `GET /:code` |
+
+`POST /links` (which allows both anonymous and authenticated callers via `optionalAuth`) picks the
+anon or auth tier per request based on whether `req.user` was populated
+(`rateLimitLinksCreate` in `middleware/rateLimit.js`).
+
+The anon tier doubles as `POST /auth/login`'s brute-force protection — no bespoke limiter was
+written for login specifically (see `docs/decisions.md`); it sits behind the same general
+infrastructure as every other unauthenticated route. Verified directly: 25 rapid bad-password
+login attempts from one IP returned `401` for the first 20 and `429 RATE_LIMITED` (with a
+computed `Retry-After` header, in seconds) for the rest.
+
+Like the cache, this fails open — a Redis error is logged and the request is allowed through rather
+than the whole API going down because rate limiting couldn't be evaluated.
 
 ## Route ordering: why `GET /:code` is mounted last
 

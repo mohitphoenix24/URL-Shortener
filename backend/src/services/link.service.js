@@ -3,8 +3,9 @@
  * generation strategies), redirection resolution, listing, updates, and
  * deletion. This layer never imports `express` and never sees `req`/`res` —
  * it can be unit-tested (or reused by a future CLI/worker) without an HTTP
- * server. Caching (Phase 3) will be added here, transparently, without
- * changing this file's public shape.
+ * server. Redis cache-aside for the redirect hot path lives here too (see
+ * `resolveLink`) — Redis is a business-rule concern the same way Postgres
+ * is, not something the controller should know about.
  * @author Mohit Sharma
  */
 
@@ -13,9 +14,13 @@ import { encodeBase62, generateRandomBase62 } from "../utils/base62.js";
 import { assertSafeUrl } from "../utils/urlSafety.js";
 import { isReservedAlias } from "../utils/reservedAliases.js";
 import { parsePagination, parseSort, buildPaginationMeta } from "../utils/pagination.js";
+import { jitteredTtlSeconds } from "../utils/jitter.js";
 import { toLinkDto } from "../utils/mappers.js";
 import { AppError } from "../utils/AppError.js";
 import { LINK_SORT_COLUMNS } from "../api/validators/link.validator.js";
+import { redis, REDIS_KEYS } from "../config/redis.js";
+import { env } from "../config/env.js";
+import { logger } from "../config/logger.js";
 
 const RANDOM_CODE_LENGTH = 8;
 const RANDOM_CODE_MAX_ATTEMPTS = 5;
@@ -43,6 +48,117 @@ function assertOwnerOrAdmin(linkRow, user) {
   if (user.role === "admin") return;
   if (linkRow.user_id !== null && String(linkRow.user_id) === String(user.id)) return;
   throw AppError.forbidden("You do not have permission to access this link", "LINK_FORBIDDEN");
+}
+
+/**
+ * Only the fields the redirect hot path needs — a cache hit never carries
+ * columns that don't matter here (title, click_count, timestamps, ...).
+ * @param {object} row - A raw `links` table row.
+ * @returns {string} JSON-serialized cache payload.
+ */
+function serializeCachedLink(row) {
+  return JSON.stringify({
+    linkId: row.id,
+    longUrl: row.long_url,
+    expiresAt: row.expires_at,
+    isActive: row.is_active,
+  });
+}
+
+/**
+ * Applies the same expired/disabled/ok decision whether the link came from
+ * Postgres or the cache. Expiry is time-based and can't be proactively
+ * invalidated the way an update/delete can, so it's re-checked against the
+ * clock on every call rather than baked into the cached payload.
+ *
+ * @param {{longUrl: string, linkId: string | number, expiresAt: string | Date | null, isActive: boolean}} link
+ * @returns {{longUrl: string, linkId: string | number}}
+ * @throws {AppError} 410 if expired, 403 if disabled.
+ */
+function evaluateResolvedLink(link) {
+  if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
+    throw AppError.gone("This short link has expired", "LINK_EXPIRED");
+  }
+  if (!link.isActive) {
+    throw AppError.forbidden("This short link has been disabled", "LINK_DISABLED");
+  }
+  return { longUrl: link.longUrl, linkId: link.linkId };
+}
+
+/**
+ * Reads both the positive and negative cache entries for a code in one
+ * round trip (`MGET`). Redis being unreachable fails open — treated as a
+ * double miss so the caller falls through to Postgres — rather than
+ * failing the request; caching is a performance optimization, not a
+ * correctness dependency.
+ *
+ * @async
+ * @param {string} shortCode
+ * @returns {Promise<{positive: object | null, negative: boolean}>}
+ */
+async function getCacheEntries(shortCode) {
+  try {
+    const [positive, negative] = await redis.mget(REDIS_KEYS.link(shortCode), REDIS_KEYS.linkNegative(shortCode));
+    return { positive: positive ? JSON.parse(positive) : null, negative: negative !== null };
+  } catch (err) {
+    logger.error({ err, shortCode }, "Link cache read failed; falling back to Postgres");
+    return { positive: null, negative: false };
+  }
+}
+
+/**
+ * Populates the positive cache with a jittered TTL, so a large batch of
+ * links cached around the same moment don't all expire in the same instant
+ * and stampede Postgres together.
+ *
+ * @async
+ * @param {string} shortCode
+ * @param {object} row - A raw `links` table row.
+ * @returns {Promise<void>}
+ */
+async function cachePositive(shortCode, row) {
+  try {
+    await redis.set(REDIS_KEYS.link(shortCode), serializeCachedLink(row), "EX", jitteredTtlSeconds(env.LINK_CACHE_TTL_SECONDS));
+  } catch (err) {
+    logger.error({ err, shortCode }, "Link cache write failed");
+  }
+}
+
+/**
+ * Caches "this code doesn't exist" with its own, much shorter TTL — protects
+ * Postgres from repeated lookups of a code that's typo'd or was never
+ * created, without risking a legitimately new link being shadowed by a
+ * stale negative entry for very long.
+ *
+ * @async
+ * @param {string} shortCode
+ * @returns {Promise<void>}
+ */
+async function cacheNegative(shortCode) {
+  try {
+    await redis.set(REDIS_KEYS.linkNegative(shortCode), "1", "EX", jitteredTtlSeconds(env.LINK_NEGATIVE_CACHE_TTL_SECONDS));
+  } catch (err) {
+    logger.error({ err, shortCode }, "Link negative-cache write failed");
+  }
+}
+
+/**
+ * Clears both cache entries for a code. Called after any write that could
+ * make a cached entry stale: an update/delete invalidates a positive entry
+ * that would otherwise keep serving the old `long_url`/`is_active`; a create
+ * invalidates a negative entry a prior lookup of the same (not-yet-taken)
+ * code might have left behind.
+ *
+ * @async
+ * @param {string} shortCode
+ * @returns {Promise<void>}
+ */
+async function bustLinkCache(shortCode) {
+  try {
+    await redis.del(REDIS_KEYS.link(shortCode), REDIS_KEYS.linkNegative(shortCode));
+  } catch (err) {
+    logger.error({ err, shortCode }, "Link cache invalidation failed");
+  }
 }
 
 /**
@@ -77,6 +193,7 @@ export async function createLink({ longUrl, mode, customAlias, title, expiresAt,
     const id = await linkRepository.nextLinkId();
     try {
       const row = await linkRepository.insertLink({ id, shortCode: customAlias, longUrl, userId, title, expiresAt });
+      await bustLinkCache(customAlias); // clears any stale negative entry from a lookup before this alias existed
       return toLinkDto(row);
     } catch (err) {
       if (isUniqueViolation(err)) {
@@ -92,6 +209,7 @@ export async function createLink({ longUrl, mode, customAlias, title, expiresAt,
       const shortCode = generateRandomBase62(RANDOM_CODE_LENGTH);
       try {
         const row = await linkRepository.insertLink({ id, shortCode, longUrl, userId, title, expiresAt });
+        await bustLinkCache(shortCode);
         return toLinkDto(row);
       } catch (err) {
         if (!isUniqueViolation(err) || attempt === RANDOM_CODE_MAX_ATTEMPTS) throw err;
@@ -104,14 +222,17 @@ export async function createLink({ longUrl, mode, customAlias, title, expiresAt,
   const id = await linkRepository.nextLinkId();
   const shortCode = encodeBase62(id);
   const row = await linkRepository.insertLink({ id, shortCode, longUrl, userId, title, expiresAt });
+  await bustLinkCache(shortCode); // clears a stale negative entry if this (sequential) code was probed before it existed
   return toLinkDto(row);
 }
 
 /**
- * Resolves a short code to its destination for the redirect handler.
- *
- * No caching yet (Phase 3 adds Redis cache-aside here transparently) — every
- * call hits Postgres directly.
+ * Resolves a short code to its destination for the redirect handler —
+ * cache-aside: check Redis first, fall back to Postgres on a miss and
+ * populate the cache for next time. A jittered TTL on both the positive and
+ * negative entries prevents a synchronized wave of expirations from all
+ * hitting Postgres at once. Redis being down degrades to "every request hits
+ * Postgres," not an outage — see {@link getCacheEntries}.
  *
  * @async
  * @param {string} shortCode
@@ -119,17 +240,28 @@ export async function createLink({ longUrl, mode, customAlias, title, expiresAt,
  * @throws {AppError} 404 unknown code, 410 expired, 403 disabled.
  */
 export async function resolveLink(shortCode) {
-  const link = await linkRepository.findActiveByShortCode(shortCode);
-  if (!link) {
+  const { positive, negative } = await getCacheEntries(shortCode);
+
+  if (positive) {
+    return evaluateResolvedLink(positive);
+  }
+  if (negative) {
     throw AppError.notFound("This short link does not exist", "LINK_NOT_FOUND");
   }
-  if (link.expires_at && new Date(link.expires_at) < new Date()) {
-    throw AppError.gone("This short link has expired", "LINK_EXPIRED");
+
+  const link = await linkRepository.findActiveByShortCode(shortCode);
+  if (!link) {
+    await cacheNegative(shortCode);
+    throw AppError.notFound("This short link does not exist", "LINK_NOT_FOUND");
   }
-  if (!link.is_active) {
-    throw AppError.forbidden("This short link has been disabled", "LINK_DISABLED");
-  }
-  return { longUrl: link.long_url, linkId: link.id };
+
+  await cachePositive(shortCode, link);
+  return evaluateResolvedLink({
+    longUrl: link.long_url,
+    linkId: link.id,
+    expiresAt: link.expires_at,
+    isActive: link.is_active,
+  });
 }
 
 /**
@@ -191,6 +323,9 @@ export async function updateLink(id, fields, user) {
   assertOwnerOrAdmin(existing, user);
 
   const row = await linkRepository.updateById(id, fields);
+  // Invalidate rather than update-in-place: simpler than keeping the cache
+  // payload in sync field-by-field, and the next redirect just repopulates it.
+  await bustLinkCache(existing.short_code);
   return toLinkDto(row);
 }
 
@@ -207,4 +342,5 @@ export async function deleteLink(id, user) {
   assertOwnerOrAdmin(existing, user);
 
   await linkRepository.softDeleteById(id);
+  await bustLinkCache(existing.short_code);
 }

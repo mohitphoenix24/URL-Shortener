@@ -175,12 +175,14 @@ scoped to owner": Bitly and every real link-shortener product require login to s
 links; only the redirect itself (`GET /:code`) stays fully public, because that's the one operation
 that has to work for anyone clicking a shared link regardless of who they are.
 
-## Login brute-force protection: deferred to Phase 3, not duplicated here
+## Login brute-force protection: the general rate limiter, not a bespoke one
 
-`POST /api/v1/auth/login` has no rate limiting of its own. That's not an oversight — Phase 3 adds a
-hand-written Redis token-bucket rate limiter as a piece of general request-handling infrastructure,
-and login will sit behind it like every other endpoint once it exists, rather than getting a
-bespoke ad-hoc limiter now that would just get replaced.
+`POST /api/v1/auth/login` has no rate limiting of its own — it sits behind the same anon-by-IP
+token-bucket tier as `/register`, `/refresh`, `/logout`, and anonymous link creation
+(`middleware/rateLimit.js`, Phase 3), rather than a bespoke ad-hoc limiter that would just
+duplicate it. Verified directly: 25 rapid bad-password attempts from one IP got `401` for the
+first 20 (`RATE_LIMIT_ANON_CAPACITY`) and `429 RATE_LIMITED` for the rest, with a computed
+`Retry-After` header. Full design in `docs/system-design.md`.
 
 ## Testcontainers instead of a shared test database
 

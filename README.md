@@ -164,7 +164,8 @@ Built in phases, each one committed working end-to-end. See
       from Phase 6)
 - [x] Phase 2 — Auth & ownership (JWT rotation + reuse detection, RBAC) + frontend login/register,
       session persistence across reload
-- [ ] Phase 3 — Redis cache-aside + hand-written rate limiter
+- [x] Phase 3 — Redis cache-aside on the redirect hot path + hand-written token-bucket rate limiter
+      (Lua script, three tiers: anon/auth/redirect), doubling as login brute-force protection
 - [ ] Phase 4 — Click analytics
 - [ ] Phase 5 — Tests & API docs (OpenAPI/Swagger, Postman)
 - [ ] Phase 6 — Frontend polish pass (real design)
