@@ -132,6 +132,58 @@ an ancestor of `.header` (a sibling section, not a parent) — clip only the box
 confirmed by re-checking both properties together afterward: sticky header still pins at `top: 0`
 on scroll, and mobile `scrollWidth` still equals `clientWidth`.
 
+## Docker: a `migrator` stage separate from `runner`, not one image that does both
+
+`backend/Dockerfile` builds two independent runtime images from the same source: `runner` (the API
+process, `npm ci --omit=dev`) and `migrator` (`node-pg-migrate up`, full `npm ci`). `node-pg-migrate`
+is a devDependency precisely because the *running server* never calls it — only a one-off deploy
+step does — so baking it into the image that stays up and serves traffic would ship tooling nothing
+at runtime uses. `docker-compose.yml`'s `migrate` service runs once (`profiles: ["full"]`, no
+`restart:` policy) and `api` waits on `service_completed_successfully` from it, so the API container
+never starts against an unmigrated database — and never *auto*-migrates on its own boot either, which
+matters once there's more than one replica: several instances racing to migrate on startup is a real
+failure mode, an explicit one-shot step isn't.
+
+## Docker Compose profiles: keeping the host `npm run dev` workflow and the fully-containerised one from colliding
+
+`postgres`/`redis` have no `profiles:` (always started by plain `docker compose up -d`); `migrate`/
+`api`/`web` are gated behind `profiles: ["full"]`. Without that gate, adding `api`/`web` as ordinary
+services would mean `docker compose up -d` — the exact command Phase 0's "Getting started" already
+tells a new clone to run — now also tries to bind ports 4500 and 5175, which the host-run
+`npm run dev` processes from that same guide already own. The gate is what lets both workflows keep
+being true at once: `docker compose up -d` for infra-only + host dev servers (fast reload), or
+`docker compose --profile full up --build` for the whole stack, containerised.
+
+## Three real bugs, caught only by actually running `--profile full`, not by writing the Dockerfiles carefully
+
+Docker configs that merely *look* plausible are exactly the kind of thing that only fails the first
+time someone really needs the container to boot — so before calling Phase 7 done, the full profile
+was actually built and run, end to end, browser included. It surfaced three genuine bugs a careful
+read of the Dockerfiles alone wouldn't have:
+
+1. **`NODE_ENV` from the wrong source.** `api`'s `env_file: ./backend/.env` loads the *host* dev
+   value (`NODE_ENV=development`, correct for `npm run dev`) — and Compose's `environment:` block
+   only overrides `DATABASE_URL`/`REDIS_URL`, not `NODE_ENV`. `env_file` values apply before
+   `environment:` overrides, so without an explicit `NODE_ENV: production` override too, the
+   container crash-looped: `config/logger.js` tried to load the dev-only `pino-pretty` transport, a
+   devDependency the lean `prod-deps` stage (`npm ci --omit=dev`) never installs.
+2. **A missing `COPY`.** `backend/Dockerfile`'s `runner` stage copied `src/`, `package.json`, and
+   `openapi.yaml`, but not `scripts/` — `config/redis.js` reads `scripts/rateLimit.lua` at startup to
+   register the rate-limiter's Lua command, so the container crashed with `ENOENT` until that line
+   was added.
+3. **`localhost` resolving to the wrong stack.** Both `HEALTHCHECK`s used `wget http://localhost/...`.
+   `nginx`'s (and, incidentally, could have affected Node's) container only listens on IPv4; when
+   `localhost` resolved to the IPv6 loopback (`::1`) first, `wget` got "connection refused" against a
+   port nothing was listening on there — even though the server was completely healthy and serving
+   real 200s the whole time, visible in its own access log. Docker reported the container
+   "unhealthy" regardless, because the healthcheck itself, not the server, was hitting the wrong
+   address. Fixed by pinning both healthchecks to `127.0.0.1` explicitly rather than relying on
+   `localhost` resolving predictably in every environment.
+
+All three were invisible from reading the Dockerfile/compose YAML in isolation — each only showed up
+as a real container failing to start or reporting unhealthy, confirmed by `docker logs` and
+`docker inspect --format '{{json .State.Health}}'`, not by inspection.
+
 ## Hybrid JWT: stateless access token, stateful-revocable refresh token
 
 The roadmap frames "Stateful Sessions vs Stateless JWT" as a choice, but production systems that

@@ -1,8 +1,14 @@
 name: url-shortener
 
-# Local dev infra: Postgres + Redis. The API runs on the host with `npm run dev`
-# during Phase 0-6 (fast reload). Phase 7 adds an `api` service here for the
-# fully containerised stack.
+# `docker compose up -d` (no profile) starts ONLY Postgres + Redis — the
+# day-to-day dev workflow (README "Getting started") runs the API and
+# frontend on the host with `npm run dev` for fast reload, against these two
+# containers. `migrate`/`api`/`web` below are gated behind `--profile full`
+# specifically so plain `docker compose up -d` keeps working unchanged for
+# that workflow — without a profile, those three would try to bind the same
+# ports (4500, 5175) the host-run dev processes already use, and collide.
+#
+# Fully containerised stack (Phase 7): `docker compose --profile full up --build`
 #
 # Host ports are deliberately non-default (5435 / 6381) to avoid clashing with
 # other Postgres/Redis instances already running on this machine (aika-*, etc).
@@ -40,6 +46,82 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # One-shot: runs `node-pg-migrate up` against the containerised Postgres,
+  # then exits. Not `restart: unless-stopped` (a migration job that restarts
+  # forever on exit 0 makes no sense) — `api` waits on
+  # `service_completed_successfully`, so it never starts against an
+  # unmigrated database.
+  migrate:
+    profiles: ["full"]
+    build:
+      context: ./backend
+      target: migrator
+    container_name: url-shortener-migrate
+    env_file: ./backend/.env
+    environment:
+      # Overrides the host-facing values from backend/.env (which point at
+      # localhost:5435, correct for a process running on the host) — inside
+      # the compose network, Postgres is reachable at its *service name* on
+      # its *container* port, not the host-mapped one.
+      DATABASE_URL: postgresql://url_shortener:url_shortener_dev_pw@postgres:5432/url_shortener
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    profiles: ["full"]
+    build:
+      context: ./backend
+      target: runner
+    container_name: url-shortener-api
+    restart: unless-stopped
+    ports:
+      - "4500:4500"
+    env_file: ./backend/.env
+    environment:
+      # Same reasoning as `migrate` above — service names, container ports.
+      DATABASE_URL: postgresql://url_shortener:url_shortener_dev_pw@postgres:5432/url_shortener
+      REDIS_URL: redis://redis:6379
+      # env_file (loaded first) pulls in backend/.env's NODE_ENV=development —
+      # correct for the host `npm run dev` workflow, wrong here. Compose's
+      # `environment:` block outranks `env_file` for the same key, so this
+      # is what actually makes config/logger.js treat this as production and
+      # skip requiring `pino-pretty`, a devDependency the lean runtime image
+      # (`prod-deps` stage, `npm ci --omit=dev`) never installs. Caught
+      # directly: without this override, the container crash-looped on
+      # `Error: unable to determine transport target for "pino-pretty"`.
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:4500/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  web:
+    profiles: ["full"]
+    build:
+      context: ./frontend
+      args:
+        # Browser-facing URL — the same host port `api` publishes above,
+        # not the container-network address `web` never talks to directly
+        # (this becomes a static string baked into the JS bundle at build
+        # time; see frontend/Dockerfile's own comment on why).
+        VITE_API_BASE_URL: http://localhost:4500
+    container_name: url-shortener-web
+    restart: unless-stopped
+    ports:
+      - "5175:80"
+    depends_on:
+      - api
 
 volumes:
   pg_data:

@@ -1,5 +1,7 @@
 # URL Shortener
 
+[![CI](https://github.com/mohitphoenix24/URL-Shortener/actions/workflows/ci.yml/badge.svg)](https://github.com/mohitphoenix24/URL-Shortener/actions/workflows/ci.yml)
+
 A production-shaped URL shortener built to learn backend engineering properly, not to finish a
 tutorial. Author: **Mohit Sharma**.
 
@@ -73,6 +75,21 @@ cp .env.example .env
 npm install
 npm run dev      # → http://localhost:5175
 ```
+
+### Fully containerised (Phase 7)
+
+No local Node install needed — everything, including the app and API, runs in Docker:
+
+```bash
+cp backend/.env.example backend/.env   # fill in JWT secrets etc. as above
+docker compose --profile full up --build
+```
+
+`docker compose up -d` (no profile, the command above) starts only Postgres + Redis — that's what
+the host `npm run dev` workflow above expects. `--profile full` additionally builds and runs the API
+(`backend/Dockerfile`, migrations applied by a one-shot `migrate` service first) and the frontend
+(`frontend/Dockerfile`, a static build served by nginx), on the same ports as the host workflow
+(4500, 5175) — the two are alternatives, not meant to run at the same time.
 
 ## API quick reference
 
@@ -202,7 +219,9 @@ Built in phases, each one committed working end-to-end. See
       OpenAPI/Swagger UI at `/docs` + a runnable Postman collection
 - [x] Phase 6 — Frontend polish pass: token-driven design system (Inter, refined palette,
       shadow/radius scale), light/dark theme with no flash-of-wrong-theme, skeleton loading state
-- [ ] Phase 7 — Docker & CI/CD
+- [x] Phase 7 — Multi-stage Dockerfiles (backend: lean `runner` + separate `migrator` stage;
+      frontend: nginx-served static build), `docker compose --profile full` for the whole stack,
+      GitHub Actions CI (lint, unit + integration tests, both frontend and Docker builds)
 - [ ] Phase 8 — Observability (Prometheus/Grafana) & deploy
 
 ## License

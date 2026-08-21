@@ -1,0 +1,88 @@
+name: CI
+
+# Four independent checks, not one chained pipeline — a lint failure
+# shouldn't hide whether the Dockerfiles still build, and vice versa. Every
+# job reports its own status in the PR check list, so a failure says exactly
+# which of "lint/unit", "integration", "frontend build", or "Docker build"
+# broke, not just "CI failed."
+#
+# No image push here on purpose — this is CI (verify every change), not CD
+# (ship it somewhere). Where and how this deploys is Phase 8's concern, once
+# there's an actual target to push to; building unpushed images here still
+# catches a broken Dockerfile the moment it breaks, without needing registry
+# credentials this repo doesn't have yet.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-lint-and-unit:
+    name: Backend / lint + unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - working-directory: backend
+        run: npm ci
+      - working-directory: backend
+        run: npm run lint
+      - working-directory: backend
+        run: npm run test:unit
+
+  backend-integration:
+    name: Backend / integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - working-directory: backend
+        run: npm ci
+      # GitHub-hosted ubuntu runners already have a Docker daemon at
+      # /var/run/docker.sock — Testcontainers finds it automatically, no
+      # docker-in-docker setup or GitHub Actions `services:` block needed.
+      # tests/integration/globalSetup.js starts real Postgres/Redis
+      # containers itself, exactly like it does locally.
+      - working-directory: backend
+        run: npm run test:integration
+
+  frontend-build:
+    name: Frontend / build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - working-directory: frontend
+        run: npm ci
+      - working-directory: frontend
+        run: npm run build
+
+  docker-build:
+    name: Docker / image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Both targets in backend/Dockerfile, not just the default — a broken
+      # `migrator` stage would otherwise only surface the first time someone
+      # actually tries to run migrations against a real deploy.
+      - name: Build backend (runner)
+        run: docker build --target runner -t url-shortener-api:ci ./backend
+      - name: Build backend (migrator)
+        run: docker build --target migrator -t url-shortener-migrate:ci ./backend
+      - name: Build frontend
+        run: docker build -t url-shortener-web:ci ./frontend
