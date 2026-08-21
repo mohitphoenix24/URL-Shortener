@@ -29,12 +29,16 @@ function setRefreshCookie(res, token, expiresAt) {
   res.cookie(REFRESH_COOKIE_NAME, token, {
     httpOnly: true,
     secure: isProduction,
-    // "lax" (not "strict") so the cookie still rides along on a top-level
-    // GET navigation to this site, while still being withheld from
-    // cross-site POSTs — the standard baseline CSRF mitigation for a
-    // same-site-in-practice setup like this one (frontend and backend
-    // differ only by port locally, which SameSite treats as the same site).
-    sameSite: "lax",
+    // "lax" locally (frontend and backend differ only by port, which
+    // SameSite treats as the same site) but "none" in production: the
+    // deployed frontend and API sit on different onrender.com subdomains,
+    // and onrender.com is on the public suffix list, so browsers treat
+    // those as genuinely different sites. A "lax" cookie is never sent on
+    // that cross-site request — confirmed directly: every page refresh
+    // silently failed the "restore session from refresh cookie" call and
+    // logged the user out. "None" requires "Secure", which isProduction
+    // already guarantees above.
+    sameSite: isProduction ? "none" : "lax",
     path: REFRESH_COOKIE_PATH,
     expires: expiresAt,
   });
