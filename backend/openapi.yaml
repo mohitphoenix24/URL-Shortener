@@ -1,0 +1,588 @@
+openapi: 3.0.3
+info:
+  title: URL Shortener API
+  version: "1.0.0"
+  description: |
+    A production-shaped URL shortener API. See the repository README for the
+    full architecture writeup — this document covers the HTTP contract only.
+
+    **Auth model**: access tokens are short-lived stateless JWTs sent as
+    `Authorization: Bearer <token>`; refresh tokens are httpOnly cookies
+    (scoped to `/api/v1/auth`) issued alongside them, single-use, and
+    rotated on every `/auth/refresh` call.
+
+    **Errors** always take the shape `{ "error": { "code", "message",
+    "details"? } }` — `code` is the stable, machine-readable identifier to
+    branch on; `message` is human-readable and safe to display.
+  contact:
+    name: Mohit Sharma
+servers:
+  - url: http://localhost:4500
+    description: Local development
+
+tags:
+  - name: Health
+    description: Liveness/readiness probes and the Prometheus scrape target — unversioned, at the root path.
+  - name: Auth
+    description: Registration, login, refresh-token rotation, logout.
+  - name: Links
+    description: Create, list, read, update, and soft-delete short links.
+  - name: Redirect
+    description: The public redirect hot path.
+  - name: Analytics
+    description: Per-link click analytics.
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: LINK_NOT_FOUND
+            message:
+              type: string
+              example: This short link does not exist
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  path:
+                    type: string
+                  message:
+                    type: string
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "3"
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [user, admin]
+        createdAt:
+          type: string
+          format: date-time
+
+    Session:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        accessToken:
+          type: string
+          description: Short-lived JWT. Hold in memory only — never localStorage.
+
+    Link:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "14776337"
+        shortCode:
+          type: string
+          example: "10001"
+        shortUrl:
+          type: string
+          example: "http://localhost:4500/10001"
+        longUrl:
+          type: string
+          format: uri
+        userId:
+          type: string
+          nullable: true
+          description: Null for an anonymous (unclaimed) link.
+        title:
+          type: string
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        isActive:
+          type: boolean
+        clickCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+        hasNext:
+          type: boolean
+        hasPrev:
+          type: boolean
+
+    LinkAnalytics:
+      type: object
+      properties:
+        linkId:
+          type: string
+        shortCode:
+          type: string
+        rangeDays:
+          type: integer
+        totalClicks:
+          type: integer
+        uniqueVisitors:
+          type: integer
+          description: COUNT(DISTINCT ip_hash) within the requested window.
+        clicksByDay:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              count:
+                type: integer
+        topReferrers:
+          type: array
+          items:
+            type: object
+            properties:
+              referrer:
+                type: string
+                description: '"direct" when the click had no Referer header.'
+              count:
+                type: integer
+        deviceBreakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              deviceType:
+                type: string
+                example: desktop
+              count:
+                type: integer
+        browserBreakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              browser:
+                type: string
+              count:
+                type: integer
+        osBreakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              os:
+                type: string
+              count:
+                type: integer
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid access token.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Authenticated, but not the owner of this resource (and not an admin).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Resource does not exist, or is soft-deleted.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ValidationError:
+      description: Request failed validation.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    RateLimited:
+      description: Too many requests. See the `Retry-After` header (seconds).
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+paths:
+  /healthz:
+    get:
+      tags: [Health]
+      summary: Process liveness
+      description: Always 200 if the process can respond. Does not check dependencies.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { status: { type: string, example: ok } }
+
+  /readyz:
+    get:
+      tags: [Health]
+      summary: Dependency readiness (Postgres + Redis)
+      responses:
+        "200":
+          description: Ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ready }
+                  dependencies:
+                    type: object
+                    properties:
+                      postgres: { type: string, example: up }
+                      redis: { type: string, example: up }
+        "503":
+          description: Not ready — at least one dependency is unreachable.
+
+  /metrics:
+    get:
+      tags: [Health]
+      summary: Prometheus scrape target
+      responses:
+        "200":
+          description: Prometheus text-format metrics
+          content:
+            text/plain: {}
+
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register and immediately log in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+      responses:
+        "201":
+          description: Account created; session issued (refresh token as an httpOnly cookie)
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { data: { $ref: "#/components/schemas/Session" } }
+        "409":
+          description: Email already registered (code EMAIL_TAKEN)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200":
+          description: Session issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { data: { $ref: "#/components/schemas/Session" } }
+        "401":
+          description: Wrong email or password (code INVALID_CREDENTIALS — identical for both, so a failed login can't enumerate registered emails)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Rotate the refresh token and issue a new access token
+      description: |
+        Reads the refresh token from the httpOnly cookie if present, otherwise
+        from the request body (for curl/Postman, which can't easily hold a
+        cookie jar). The presented token is single-use: reusing an
+        already-rotated token revokes every session on the account
+        (`REFRESH_TOKEN_REUSED`), not just this one request.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { refreshToken: { type: string } }
+      responses:
+        "200":
+          description: New session issued; old refresh token is now revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { data: { $ref: "#/components/schemas/Session" } }
+        "401":
+          description: Missing, invalid, expired, unknown, or reused refresh token
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke the presented refresh token
+      description: Idempotent — succeeds even if the token is missing, unknown, or already revoked.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { refreshToken: { type: string } }
+      responses:
+        "204": { description: Logged out }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: The caller's own identity, from their access token
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { data: { $ref: "#/components/schemas/User" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /api/v1/links:
+    post:
+      tags: [Links]
+      summary: Create a short link
+      description: |
+        Anonymous creation is allowed (`Authorization` is optional) — the
+        link is created unclaimed (`userId: null`). `customAlias` (if
+        given) always wins over `?mode`.
+      parameters:
+        - name: mode
+          in: query
+          schema: { type: string, enum: [auto, random], default: auto }
+          description: '"random" generates an unguessable 8-char code instead of the default sequential Base62 code.'
+      security: [{ bearerAuth: [] }, {}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [longUrl]
+              properties:
+                longUrl: { type: string, format: uri, maxLength: 2048 }
+                customAlias: { type: string, pattern: "^[a-zA-Z0-9_-]{3,32}$" }
+                title: { type: string, maxLength: 200 }
+                expiresAt: { type: string, format: date-time }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { data: { $ref: "#/components/schemas/Link" } }
+        "409":
+          description: customAlias reserved or already taken (ALIAS_RESERVED / ALIAS_TAKEN)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Malformed body, or longUrl fails the SSRF safety check
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+    get:
+      tags: [Links]
+      summary: List links, scoped to the caller (unscoped for an admin)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: sort, in: query, schema: { type: string, example: "clickCount:desc" } }
+        - { name: isActive, in: query, schema: { type: string, enum: [true, false] } }
+        - { name: search, in: query, schema: { type: string }, description: Matches against title or longUrl. }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Link" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /api/v1/links/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Links]
+      summary: Get a single link
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { data: { $ref: "#/components/schemas/Link" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    patch:
+      tags: [Links]
+      summary: Update a link's title, isActive, or expiresAt
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                title: { type: string, nullable: true, maxLength: 200 }
+                expiresAt: { type: string, format: date-time, nullable: true }
+                isActive: { type: boolean }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { data: { $ref: "#/components/schemas/Link" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    delete:
+      tags: [Links]
+      summary: Soft-delete a link
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /api/v1/analytics/links/{id}:
+    get:
+      tags: [Analytics]
+      summary: Aggregate click analytics for one link
+      description: Owner-or-admin-scoped, identically to the links resource itself.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - name: days
+          in: query
+          schema: { type: integer, default: 30, minimum: 1, maximum: 365 }
+          description: Look back this many days from now.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { data: { $ref: "#/components/schemas/LinkAnalytics" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /{code}:
+    get:
+      tags: [Redirect]
+      summary: Resolve a short code and redirect to its destination
+      description: |
+        Fully public — no authentication. Always a 302 (not 301), so it
+        never gets permanently cached by a browser: a link's destination
+        stays changeable, and every click keeps hitting this server so click
+        analytics can be recorded. Cache-aside on Redis in front of Postgres
+        (see the system-design doc); the cache is entirely transparent to
+        this contract.
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses:
+        "302": { description: Redirect to the link's longUrl }
+        "403":
+          description: Link is disabled (LINK_DISABLED)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410":
+          description: Link has expired (LINK_EXPIRED)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }

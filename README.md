@@ -155,13 +155,33 @@ curl -s http://localhost:4500/readyz      # dependency readiness (Postgres + Red
 curl -s http://localhost:4500/metrics     # Prometheus scrape target
 ```
 
-## Testing
+## API documentation
 
 ```bash
-npm test              # unit + integration (spins real Postgres/Redis via Testcontainers)
-npm run test:unit
-npm run test:integration
+open http://localhost:4500/docs       # interactive Swagger UI
+curl -s http://localhost:4500/openapi # the raw OpenAPI 3.0 document
 ```
+
+A companion Postman collection lives at
+[`backend/postman/URL-Shortener.postman_collection.json`](backend/postman/URL-Shortener.postman_collection.json) —
+import it, run **Register** or **Login** first (both save `{{accessToken}}` automatically via a
+test script), then everything else in the collection reuses it.
+
+## Testing
+
+Two genuinely different tiers, run separately on purpose — see
+[`backend/vitest.workspace.js`](backend/vitest.workspace.js):
+
+```bash
+npm test               # both tiers (what CI runs)
+npm run test:unit      # pure functions only — no Docker, no I/O, milliseconds
+npm run test:integration  # real Postgres + Redis via Testcontainers, real supertest HTTP calls
+```
+
+Integration tests share one Postgres/Redis pair for the whole run (container startup dominates
+otherwise) and isolate via `TRUNCATE`/`FLUSHDB` between tests — see
+[`docs/decisions.md`](docs/decisions.md) for a real cross-file race this surfaced during
+development, and how it was fixed.
 
 ## Project status
 
@@ -178,7 +198,8 @@ Built in phases, each one committed working end-to-end. See
       (Lua script, three tiers: anon/auth/redirect), doubling as login brute-force protection
 - [x] Phase 4 — Click analytics: fire-and-forget capture (IP hashed with a secret salt, UA-parsed
       device/browser/os) on every redirect, `GET /api/v1/analytics/links/:id` for the aggregates
-- [ ] Phase 5 — Tests & API docs (OpenAPI/Swagger, Postman)
+- [x] Phase 5 — 144 tests (83 unit, 61 integration against real Testcontainers Postgres/Redis) +
+      OpenAPI/Swagger UI at `/docs` + a runnable Postman collection
 - [ ] Phase 6 — Frontend polish pass (real design)
 - [ ] Phase 7 — Docker & CI/CD
 - [ ] Phase 8 — Observability (Prometheus/Grafana) & deploy

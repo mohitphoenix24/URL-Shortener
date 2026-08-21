@@ -190,3 +190,33 @@ Integration tests spin up real, disposable Postgres and Redis containers per run
 pointing at the dev database in `docker-compose.yml`. Tests that depend on manually-managed shared
 state are not really integration tests — they're flaky reruns of whatever the DB happened to
 contain last.
+
+## One shared container pair for the whole integration run, not one per test file
+
+Starting a fresh Postgres+Redis pair per test file would isolate perfectly but pay container-startup
+cost dozens of times over. Instead, `tests/integration/globalSetup.js` starts one pair for the
+entire `test:integration` run and hands the connection strings to every file via Vitest's
+`provide`/`inject`; each test isolates by `TRUNCATE ... RESTART IDENTITY CASCADE` /
+`FLUSHDB` in `beforeEach` rather than by container boundaries.
+
+**A real cross-file race, caught by running the suite, not by reasoning about it.** The first full
+run of the integration suite produced a cluster of failures with no obvious common cause: a
+duplicate-email register that should 409 instead succeeded with 201; a login immediately after
+register 500'd with a Postgres foreign-key violation on `refresh_tokens.user_id`; a redirect for a
+link created two lines earlier 404'd. All different symptoms of the same thing: Vitest runs test
+*files* in parallel by default, and every file was pointed at the same shared Postgres/Redis pair —
+file B's `beforeEach` truncating `users` mid-flight while file A's request was still inserting a
+refresh token for a user that had just ceased to exist. `test.fileParallelism: false` on the
+integration project alone didn't fix it (parallelism scheduling turned out to happen at the root
+Vitest instance, not per-workspace-project); pinning the project to `poolOptions.forks.singleFork:
+true` did — one fork, one file at a time, full run went from 17 failures to 0. Left both settings in
+`vitest.workspace.js` with this reasoning inline, since removing either looks like harmless cleanup
+otherwise.
+
+## Unit vs. integration as separate Vitest workspace projects, not one config
+
+A single `vitest.config.js` with one `globalSetup` would force `npm run test:unit` to boot two
+Docker containers it never touches, just because integration tests elsewhere in the same config
+need them. `vitest.workspace.js` defines two projects with independent `globalSetup`/`setupFiles` —
+unit tests stay Docker-free and millisecond-fast; only `--project integration` pays the
+Testcontainers cost.

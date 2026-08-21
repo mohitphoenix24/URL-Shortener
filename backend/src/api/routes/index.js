@@ -10,6 +10,7 @@ import { healthRouter } from "./health.routes.js";
 import { authRouter } from "./auth.routes.js";
 import { linkRouter } from "./link.routes.js";
 import { analyticsRouter } from "./analytics.routes.js";
+import { docsRouter } from "./docs.routes.js";
 import { redirectRouter } from "./redirect.routes.js";
 
 export const router = Router();
@@ -21,6 +22,11 @@ router.use(healthRouter);
 router.use("/api/v1/auth", authRouter);
 router.use("/api/v1/links", linkRouter);
 router.use("/api/v1/analytics", analyticsRouter);
+
+// /docs and /openapi, also at the root (not /api/v1) — same reasoning as
+// health/metrics above, and both are reserved short-link aliases for
+// exactly this reason (utils/reservedAliases.js).
+router.use(docsRouter);
 
 // MUST be last: GET /:code is a single-segment catch-all that would shadow
 // any route registered after it (e.g. a future single-segment path).

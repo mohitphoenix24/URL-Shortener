@@ -1,0 +1,235 @@
+{
+  "info": {
+    "_postman_id": "b3f2a2e0-1b1a-4e9a-9c9a-url-shortener-api",
+    "name": "URL Shortener API",
+    "description": "Companion to openapi.yaml / GET /docs. Register or Login first — both save {{accessToken}} automatically via a test script, and every other request reuses it. Create Link similarly saves {{linkId}} and {{shortCode}} for the requests that follow it.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4500" },
+    { "key": "accessToken", "value": "" },
+    { "key": "linkId", "value": "" },
+    { "key": "shortCode", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Liveness",
+          "request": { "method": "GET", "url": "{{baseUrl}}/healthz" }
+        },
+        {
+          "name": "Readiness",
+          "request": { "method": "GET", "url": "{{baseUrl}}/readyz" }
+        },
+        {
+          "name": "Prometheus metrics",
+          "request": { "method": "GET", "url": "{{baseUrl}}/metrics" }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "if (body.data?.accessToken) pm.collectionVariables.set('accessToken', body.data.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"postman-user-{{$randomInt}}@example.com\",\n  \"password\": \"password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "if (body.data?.accessToken) pm.collectionVariables.set('accessToken', body.data.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"you@example.com\",\n  \"password\": \"password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Refresh",
+          "description": "Browser clients rely on the httpOnly cookie automatically; Postman's cookie jar does the same across requests to the same domain within a run. This body form is the curl/Postman fallback.",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/refresh",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/logout",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/auth/me",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}" }] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Links",
+      "item": [
+        {
+          "name": "Create Link",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "if (body.data?.id) pm.collectionVariables.set('linkId', body.data.id);",
+                  "if (body.data?.shortCode) pm.collectionVariables.set('shortCode', body.data.shortCode);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/links",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"longUrl\": \"https://github.com/mohitphoenix24\",\n  \"title\": \"My GitHub\"\n}"
+            },
+            "description": "Authorization header is optional — omit it (or leave {{accessToken}} empty) to create an anonymous, unclaimed link."
+          }
+        },
+        {
+          "name": "Create Link (custom alias)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/links",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"longUrl\": \"https://anthropic.com\",\n  \"customAlias\": \"claude-code\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Link (random code)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/links?mode=random",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"longUrl\": \"https://nodejs.org\"\n}" }
+          }
+        },
+        {
+          "name": "List Links",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/links?page=1&limit=20&sort=clickCount:desc&isActive=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "links"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "sort", "value": "clickCount:desc" },
+                { "key": "isActive", "value": "true" }
+              ]
+            },
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}" }] }
+          }
+        },
+        {
+          "name": "Get Link",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/links/{{linkId}}",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}" }] }
+          }
+        },
+        {
+          "name": "Update Link",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/v1/links/{{linkId}}",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"isActive\": false\n}" }
+          }
+        },
+        {
+          "name": "Delete Link",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/v1/links/{{linkId}}",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}" }] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "Link Analytics",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/analytics/links/{{linkId}}?days=30",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}" }] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Redirect",
+      "item": [
+        {
+          "name": "Follow short link",
+          "request": { "method": "GET", "url": "{{baseUrl}}/{{shortCode}}" },
+          "description": "Postman follows redirects by default (Settings > General > Automatically follow redirects) — disable that if you want to inspect the 302 itself."
+        }
+      ]
+    }
+  ]
+}
