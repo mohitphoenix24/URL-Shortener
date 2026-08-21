@@ -185,16 +185,15 @@ a {
   color: var(--color-primary);
 }
 
-.header__tagline {
-  color: var(--color-text-faint);
-  font-size: 13px;
-  flex: 1;
-}
-
 .header__auth {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
+  /* Pushes this group to the header's right edge. Used to come for free
+     from .header__tagline's flex:1 spacer — removing that span (the
+     leftover dev-mode tagline) left everything bunched against the logo
+     with the rest of the bar empty, caught directly from a screenshot. */
+  margin-left: auto;
 }
 
 .header__user {
@@ -205,9 +204,17 @@ a {
   gap: 8px;
 }
 
-.header__user--anon {
-  color: var(--color-text-muted);
-  font-weight: 500;
+.header__avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-primary-tint);
+  color: var(--color-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .header__role {
@@ -433,6 +440,14 @@ a {
 
 .btn--primary:hover:not(:disabled) {
   background: var(--color-primary-hover);
+}
+
+/* Compact variant for contexts smaller than the hero's Shorten button —
+   the header's Sign up button and the anonymous empty-state's Log in
+   button. Combine with .btn--primary, not a replacement for it. */
+.btn--sm {
+  padding: 8px 16px;
+  font-size: 13px;
 }
 
 .btn--ghost {
@@ -672,6 +687,63 @@ a {
 
 .auth-panel__toggle:hover {
   text-decoration: underline;
+}
+
+/* ---------- Auth modal ---------- */
+
+/* Above .toast-stack (z-index 100) and .header (z-index 50) so it covers
+   everything, including an in-flight toast. */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 18, 22, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 200;
+}
+
+.modal-panel {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 32px 28px 28px;
+}
+
+.modal-panel .auth-panel {
+  margin: 0;
+  padding: 0;
+  max-width: none;
+}
+
+.modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--color-text-faint);
+  font-size: 20px;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color 0.15s var(--ease), background 0.15s var(--ease);
+}
+
+.modal-close:hover {
+  color: var(--color-text);
+  background: var(--color-muted-bg);
 }
 
 /* ---------- Table ---------- */
@@ -986,8 +1058,36 @@ a {
 /* ---------- Responsive ---------- */
 
 @media (max-width: 640px) {
-  .header__tagline {
-    display: none;
+  .header__inner {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+
+  /* The user's email can be long — let it truncate instead of forcing the
+     header to grow wider than the viewport and clipping the auth buttons
+     off-screen. min-width:0 is required on a flex item for its own
+     overflow/text-overflow to take effect at all. */
+  .header__user {
+    min-width: 0;
+    max-width: 40vw;
+  }
+
+  .header__email {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .app__main {
+    padding: 40px 16px 64px;
+    gap: 40px;
+  }
+
+  .links-section {
+    padding: 18px;
   }
 
   .shorten-form__main {
@@ -1010,6 +1110,20 @@ a {
 
   .link-filters__search {
     width: 100%;
+  }
+
+  .pagination {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .pagination__controls {
+    justify-content: center;
+  }
+
+  .modal-panel {
+    padding: 28px 20px 20px;
   }
 }
 

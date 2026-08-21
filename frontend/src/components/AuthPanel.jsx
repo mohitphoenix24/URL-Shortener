@@ -1,8 +1,8 @@
 /**
- * @fileoverview Combined login/register form, shown in place of the links
- * table for a logged-out visitor. One component with a mode toggle rather
- * than two near-identical ones — login and register hit different
- * endpoints but share the exact same fields and validation shape.
+ * @fileoverview Combined login/register form, rendered inside `AuthModal`.
+ * One component with a mode toggle rather than two near-identical ones —
+ * login and register hit different endpoints but share the exact same
+ * fields and validation shape.
  * @author Mohit Sharma
  */
 
@@ -11,11 +11,14 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { pushToast } from "../hooks/useToasts.js";
 
 /**
+ * @param {object} props
+ * @param {"login" | "register"} [props.initialMode]
+ * @param {() => void} [props.onSuccess] - Called after a successful login/register (e.g. to close the modal).
  * @returns {JSX.Element}
  */
-export function AuthPanel() {
+export function AuthPanel({ initialMode = "login", onSuccess }) {
   const { login, register } = useAuth();
-  const [mode, setMode] = useState("login"); // "login" | "register"
+  const [mode, setMode] = useState(initialMode); // "login" | "register"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -34,6 +37,7 @@ export function AuthPanel() {
         await login({ email, password });
         pushToast("Logged in.", "success");
       }
+      onSuccess?.();
     } catch (err) {
       const detail = err.details?.[0]?.message;
       pushToast(detail ? `${err.message}: ${detail}` : err.message, "error");

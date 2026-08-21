@@ -1,6 +1,8 @@
 /**
- * @fileoverview App header. Shows the logged-in user's email and a logout
- * button when authenticated; otherwise just the tagline.
+ * @fileoverview App header. Shows the logged-in user (with a small avatar
+ * and a logout button) when authenticated; otherwise the standard "Log in /
+ * Sign up" button pair, which opens `AuthModal` rather than swapping out
+ * the page content.
  * @author Mohit Sharma
  */
 
@@ -9,9 +11,12 @@ import { pushToast } from "../hooks/useToasts.js";
 import { ThemeToggle } from "./ThemeToggle.jsx";
 
 /**
+ * @param {object} props
+ * @param {() => void} props.onLoginClick
+ * @param {() => void} props.onSignupClick
  * @returns {JSX.Element}
  */
-export function Header() {
+export function Header({ onLoginClick, onSignupClick }) {
   const { user, isAuthenticated, logout } = useAuth();
 
   async function handleLogout() {
@@ -33,7 +38,10 @@ export function Header() {
           {isAuthenticated ? (
             <>
               <span className="header__user">
-                {user.email}
+                <span className="header__avatar" aria-hidden="true">
+                  {user.email[0].toUpperCase()}
+                </span>
+                <span className="header__email">{user.email}</span>
                 {user.role === "admin" && <span className="badge badge--active header__role">admin</span>}
               </span>
               <button type="button" className="btn btn--ghost" onClick={handleLogout}>
@@ -41,7 +49,14 @@ export function Header() {
               </button>
             </>
           ) : (
-            <span className="header__user header__user--anon">Not logged in</span>
+            <>
+              <button type="button" className="btn btn--ghost" onClick={onLoginClick}>
+                Log in
+              </button>
+              <button type="button" className="btn btn--primary btn--sm" onClick={onSignupClick}>
+                Sign up
+              </button>
+            </>
           )}
           <ThemeToggle />
         </div>

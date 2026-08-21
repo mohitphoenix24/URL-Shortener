@@ -17,7 +17,7 @@ import { ResultCard } from "./components/ResultCard.jsx";
 import { LinkFilters } from "./components/LinkFilters.jsx";
 import { LinksTable } from "./components/LinksTable.jsx";
 import { Pagination } from "./components/Pagination.jsx";
-import { AuthPanel } from "./components/AuthPanel.jsx";
+import { AuthModal } from "./components/AuthModal.jsx";
 import { ToastStack } from "./components/ToastStack.jsx";
 
 const PAGE_SIZE = 10;
@@ -50,6 +50,9 @@ function AppShell() {
   const [isActive, setIsActive] = useState("");
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search);
+
+  // null | "login" | "register" — which AuthModal mode to open, if any.
+  const [authMode, setAuthMode] = useState(null);
 
   const refetch = useCallback(async () => {
     setLoading(true);
@@ -105,14 +108,12 @@ function AppShell() {
 
   return (
     <div className="app">
-      <Header />
+      <Header onLoginClick={() => setAuthMode("login")} onSignupClick={() => setAuthMode("register")} />
 
       <main className="app__main">
         <section className="hero">
           <h1 className="hero__title">Shorten a long URL</h1>
-          <p className="hero__subtitle">
-            A test harness for the URL Shortener API — every request here hits the real backend.
-          </p>
+          <p className="hero__subtitle">Paste a long link, get a short one instantly — no account required.</p>
           <ShortenForm onCreated={handleCreated} />
           {lastCreated && <ResultCard link={lastCreated} onDismiss={() => setLastCreated(null)} />}
         </section>
@@ -125,7 +126,18 @@ function AppShell() {
             </div>
           )}
 
-          {status === "anonymous" && <AuthPanel />}
+          {status === "anonymous" && (
+            <div className="links-table__empty">
+              <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+              <p>Log in to see and manage the links you own.</p>
+              <button type="button" className="btn btn--primary btn--sm" onClick={() => setAuthMode("login")}>
+                Log in
+              </button>
+            </div>
+          )}
 
           {status === "authenticated" && (
             <>
@@ -149,6 +161,7 @@ function AppShell() {
         </section>
       </main>
 
+      {authMode && <AuthModal mode={authMode} onClose={() => setAuthMode(null)} />}
       <ToastStack />
     </div>
   );
