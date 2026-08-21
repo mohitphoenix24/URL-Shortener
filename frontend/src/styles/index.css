@@ -350,14 +350,15 @@ a {
    text did. The tinted, colored state now IS the resting state, not a
    hover-only reveal, so it's visible without any interaction at all. */
 .shorten-form__advanced-toggle {
-  /* Centered under the (centered) Shorten button rather than pinned to
-     .shorten-form's left edge — .shorten-form itself stays text-align:left
-     (needed by the advanced-options fields' own labels/inputs below), so
-     this centers itself directly via margin:auto on a fit-content box
-     rather than relying on inherited text-align. */
+  /* Right-aligned under the Shorten button (which itself sits at the input
+     row's right edge) rather than .shorten-form's left edge — .shorten-form
+     stays text-align:left (needed by the advanced-options fields' own
+     labels/inputs below), so this positions itself directly via
+     margin-left:auto on a fit-content box rather than relying on the
+     parent's text-align. */
   display: flex;
   width: fit-content;
-  margin: 14px auto 0;
+  margin: 14px 0 0 auto;
   align-items: center;
   gap: 7px;
   background: var(--color-primary-tint);
@@ -774,6 +775,106 @@ a {
   background: var(--color-muted-bg);
 }
 
+/* ---------- QR modal ---------- */
+
+.qr-modal {
+  max-width: 340px;
+  text-align: center;
+}
+
+.qr-modal__title {
+  font-size: 19px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
+}
+
+.qr-modal__subtitle {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0 0 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Always a plain white card around the code, in both themes — a QR code
+   rendered on a dark .modal-panel background (as it would be in dark mode
+   with no explicit background here) loses contrast and stops scanning
+   reliably; scanners expect a light quiet zone around the pattern. */
+.qr-modal__preview {
+  display: inline-flex;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin: 0 auto 20px;
+}
+
+.qr-modal__colors {
+  margin-bottom: 20px;
+}
+
+.qr-modal__colors-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-bottom: 10px;
+}
+
+.qr-modal__swatches {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.qr-swatch {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.1s var(--ease), box-shadow 0.15s var(--ease);
+}
+
+.qr-swatch:hover {
+  transform: scale(1.1);
+}
+
+.qr-swatch--selected {
+  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-primary);
+}
+
+.qr-swatch--custom {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-muted-bg);
+  color: var(--color-text-muted);
+  overflow: hidden;
+}
+
+/* The native color input sits invisibly on top of the styled circle so the
+   whole swatch opens the OS color picker on click, rather than a tiny
+   default input box that looks out of place next to the preset swatches. */
+.qr-swatch--custom input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}
+
+.qr-modal__download {
+  width: 100%;
+}
+
 /* ---------- Table ---------- */
 
 /* Fallback safety net, not the primary fix: `.app__main`'s max-width is
@@ -869,6 +970,27 @@ a {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.link-row__qr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color 0.15s var(--ease), border-color 0.15s var(--ease), background 0.15s var(--ease);
+}
+
+.link-row__qr-btn:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: var(--color-primary-tint);
 }
 
 .links-table__empty {

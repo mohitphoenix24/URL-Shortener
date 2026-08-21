@@ -11,6 +11,7 @@ import { updateLink, deleteLink } from "../api/links.js";
 import { pushToast } from "../hooks/useToasts.js";
 import { formatDate, truncate, isExpired } from "../utils/format.js";
 import { CopyButton } from "./CopyButton.jsx";
+import { QRCodeModal } from "./QRCodeModal.jsx";
 
 /**
  * @param {object} props
@@ -21,6 +22,7 @@ import { CopyButton } from "./CopyButton.jsx";
  */
 export function LinkRow({ link, onUpdated, onDeleted }) {
   const [busy, setBusy] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   const expired = isExpired(link.expiresAt);
 
   async function handleToggleActive() {
@@ -78,11 +80,23 @@ export function LinkRow({ link, onUpdated, onDeleted }) {
             <input type="checkbox" checked={link.isActive} disabled={busy} onChange={handleToggleActive} />
             <span className="switch__track" />
           </label>
+          <button type="button" className="link-row__qr-btn" aria-label="Show QR code" onClick={() => setShowQr(true)}>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <line x1="14" y1="14" x2="14" y2="21" />
+              <line x1="21" y1="14" x2="21" y2="21" />
+              <line x1="14" y1="17.5" x2="21" y2="17.5" />
+            </svg>
+          </button>
           <button type="button" className="btn btn--danger-ghost" disabled={busy} onClick={handleDelete}>
             Delete
           </button>
         </div>
       </td>
+
+      {showQr && <QRCodeModal link={link} onClose={() => setShowQr(false)} />}
     </tr>
   );
 }

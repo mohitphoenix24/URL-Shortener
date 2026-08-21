@@ -6,7 +6,9 @@
  * @author Mohit Sharma
  */
 
+import { useState } from "react";
 import { CopyButton } from "./CopyButton.jsx";
+import { QRCodeModal } from "./QRCodeModal.jsx";
 
 /**
  * @param {object} props
@@ -15,6 +17,8 @@ import { CopyButton } from "./CopyButton.jsx";
  * @returns {JSX.Element}
  */
 export function ResultCard({ link, onDismiss }) {
+  const [showQr, setShowQr] = useState(false);
+
   return (
     <div className="result-card">
       <div className="result-card__info">
@@ -27,11 +31,16 @@ export function ResultCard({ link, onDismiss }) {
         </span>
       </div>
       <div className="result-card__actions">
+        <button type="button" className="btn btn--ghost" onClick={() => setShowQr(true)}>
+          QR code
+        </button>
         <CopyButton text={link.shortUrl} className="copy-btn--primary" />
         <button type="button" className="btn btn--ghost" onClick={onDismiss}>
           ✕
         </button>
       </div>
+
+      {showQr && <QRCodeModal link={link} onClose={() => setShowQr(false)} />}
     </div>
   );
 }
