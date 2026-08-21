@@ -118,7 +118,12 @@ function AppShell() {
         </section>
 
         <section className="links-section">
-          {status === "loading" && <div className="links-table__empty">Checking session…</div>}
+          {status === "loading" && (
+            <div className="links-table__empty">
+              <span className="spinner" aria-hidden="true" />
+              <p>Checking session…</p>
+            </div>
+          )}
 
           {status === "anonymous" && <AuthPanel />}
 

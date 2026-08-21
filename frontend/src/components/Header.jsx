@@ -6,6 +6,7 @@
 
 import { useAuth } from "../context/AuthContext.jsx";
 import { pushToast } from "../hooks/useToasts.js";
+import { ThemeToggle } from "./ThemeToggle.jsx";
 
 /**
  * @returns {JSX.Element}
@@ -22,9 +23,13 @@ export function Header() {
     <header className="header">
       <div className="header__inner">
         <span className="header__logo">
+          <svg className="header__logo-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+          </svg>
           url<span className="header__logo-accent">.short</span>
         </span>
-        <span className="header__tagline">Backend test harness — Phase 2</span>
+        <span className="header__tagline">Backend test harness — every request here hits the real API</span>
 
         <div className="header__auth">
           {isAuthenticated ? (
@@ -40,6 +45,7 @@ export function Header() {
           ) : (
             <span className="header__user header__user--anon">Not logged in</span>
           )}
+          <ThemeToggle />
         </div>
       </div>
     </header>

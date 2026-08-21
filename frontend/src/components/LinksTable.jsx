@@ -17,11 +17,33 @@ import { LinkRow } from "./LinkRow.jsx";
  */
 export function LinksTable({ links, loading, onUpdated, onDeleted }) {
   if (loading) {
-    return <div className="links-table__empty">Loading links…</div>;
+    return (
+      <div className="links-table__wrapper" aria-busy="true" aria-label="Loading links">
+        <table className="links-table">
+          <tbody>
+            {Array.from({ length: 4 }, (_, i) => (
+              <tr className="link-row link-row--skeleton" key={i}>
+                <td colSpan={7}>
+                  <span className="skeleton-bar" />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
   }
 
   if (links.length === 0) {
-    return <div className="links-table__empty">No links yet — shorten one above to get started.</div>;
+    return (
+      <div className="links-table__empty">
+        <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+        </svg>
+        <p>No links yet — shorten one above to get started.</p>
+      </div>
+    );
   }
 
   return (

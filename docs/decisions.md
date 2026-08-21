@@ -97,6 +97,41 @@ symptom stop being *visible* isn't the same as a fix that makes the underlying l
 re-verify the actual thing the user complained about (can they click Delete?), not just that the
 screenshot looks different.
 
+## Dark mode: an inline pre-paint script, not a CSS-only or React-only toggle
+
+Theme is decided in three layers, each covering a gap the other two leave: a tiny synchronous
+`<script>` in `index.html`'s `<head>` reads `localStorage`/`prefers-color-scheme` and sets
+`data-theme` on `<html>` *before* React ever loads, so there's no flash-of-wrong-theme on reload —
+a React-only `useEffect` toggle would necessarily paint the default theme first, then flip, visibly.
+`hooks/useTheme.js` owns changing it afterward (the toggle button) and keeps `localStorage` in sync.
+`styles/index.css` defines the dark palette twice — once under `@media (prefers-color-scheme: dark)`
+guarded by `:not([data-theme="light"])`, once under `[data-theme="dark"]` — so a user who never
+touches the toggle still gets dark mode from their OS setting, and the toggle's explicit choice wins
+in both directions once they do.
+
+## Frontend polish pass: a real overflow bug the fullPage screenshot masked, then didn't
+
+The hero section's decorative radial-gradient glow (`.hero::before`) is a fixed 640px wide, centered
+under `left: 50%`. On any viewport narrower than that — every phone — it extends past the visible
+edge on both sides. Verified directly with a 375px Playwright viewport:
+`document.documentElement.scrollWidth` came back 508, not 375, meaning the page actually had
+horizontal scroll on mobile despite looking fine in every desktop screenshot taken up to that point.
+
+Two fix attempts, two different ways of being wrong. First (`overflow-x: hidden` on `body` alone)
+*looked* like it worked in a screenshot but didn't: `fullPage: true` captures Playwright's underlying
+*layout* geometry (CDP's content-size metrics), which doesn't shrink just because CSS `overflow`
+visually clips it — only a viewport-sized (non-fullPage) screenshot, and a direct
+`scrollWidth`/`clientWidth` comparison, reflect what a real browser actually renders and scrolls.
+Second attempt, applying `overflow-x: hidden` to both `html` and `body` (measured correctly this
+time — `scrollWidth` did equal `clientWidth`), broke something else instead: `.header`'s
+`position: sticky` stopped sticking, scrolling away with the rest of the page. Any non-`visible`
+`overflow` on an ancestor of a sticky element can do that, and `html`/`body` are ancestors of
+*everything* — header included, even though the header has nothing to do with the glow. The actual
+fix: `overflow: hidden` on `.hero` itself, which contains the glow (a child of `.hero`) without being
+an ancestor of `.header` (a sibling section, not a parent) — clip only the box that needs clipping,
+confirmed by re-checking both properties together afterward: sticky header still pins at `top: 0`
+on scroll, and mobile `scrollWidth` still equals `clientWidth`.
+
 ## Hybrid JWT: stateless access token, stateful-revocable refresh token
 
 The roadmap frames "Stateful Sessions vs Stateless JWT" as a choice, but production systems that

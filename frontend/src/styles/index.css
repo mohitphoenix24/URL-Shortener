@@ -1,29 +1,116 @@
 /*
- * Base styles for the URL Shortener test harness.
- * Deliberately basic — function over polish, per the project's own scope
- * (Phase 1 goal is proving the API works, not a design pass). A Bitly-ish
- * orange-accent, pill-input hero layout stands in for a real design system
- * until that gets revisited later.
+ * Design system for the URL Shortener frontend (Phase 6 polish pass —
+ * Phase 1 shipped this "deliberately basic," see git history for that
+ * version). Token-driven: every color/radius/shadow/space a component uses
+ * comes from a CSS variable defined once here, redefined for dark mode by
+ * `[data-theme="dark"]` — no component file hardcodes a color.
  * Author: Mohit Sharma
+ *
+ * The Inter webfont itself is loaded via <link> tags in index.html (with a
+ * preconnect), not an @import here — @import blocks CSS parsing on the font
+ * stylesheet's own round trip before this file can finish parsing, where a
+ * <link> in <head> can fetch in parallel with everything else.
  */
 
 :root {
-  --color-bg: #f7f8fa;
+  /* ---------- Color: light (default) ---------- */
+  --color-bg: #f6f6f8;
   --color-surface: #ffffff;
-  --color-text: #1a1d29;
-  --color-text-muted: #6b7280;
-  --color-border: #e5e7eb;
-  --color-primary: #ee6123;
-  --color-primary-hover: #d6531a;
-  --color-success: #16a34a;
-  --color-success-bg: #ecfdf3;
+  --color-surface-hover: #fafafb;
+  --color-border: #e6e7eb;
+  --color-border-strong: #d3d5db;
+  --color-text: #16181d;
+  --color-text-muted: #666b76;
+  --color-text-faint: #9aa0ab;
+
+  --color-primary: #ea580c;
+  --color-primary-hover: #c2410c;
+  --color-primary-active: #9a3412;
+  --color-primary-tint: #fef1e8;
+  --color-primary-ring: rgba(234, 88, 12, 0.16);
+  --color-primary-contrast: #ffffff;
+
+  --color-success: #15803d;
+  --color-success-bg: #e9f9ef;
   --color-danger: #dc2626;
-  --color-danger-bg: #fef2f2;
-  --color-muted-bg: #f1f2f4;
-  --radius: 10px;
+  --color-danger-bg: #fdecec;
+  --color-muted-bg: #f0f1f3;
+
+  /* ---------- Scale ---------- */
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
   --radius-pill: 999px;
-  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
-  --shadow-md: 0 4px 16px rgba(16, 24, 40, 0.08);
+  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.07), 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-md: 0 8px 24px rgba(16, 24, 40, 0.09), 0 2px 6px rgba(16, 24, 40, 0.05);
+  --shadow-lg: 0 16px 48px rgba(16, 24, 40, 0.14), 0 4px 12px rgba(16, 24, 40, 0.06);
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* System dark preference, honored only when the user hasn't explicitly
+   chosen "light" (the toggle sets data-theme explicitly either way — see
+   hooks/useTheme.js — so this block is the *default-follows-OS* case). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: #101114;
+    --color-surface: #17181d;
+    --color-surface-hover: #1d1f25;
+    --color-border: #292b32;
+    --color-border-strong: #383a43;
+    --color-text: #f1f2f4;
+    --color-text-muted: #9aa0ab;
+    --color-text-faint: #6b7280;
+
+    --color-primary: #fb8a3c;
+    --color-primary-hover: #fda766;
+    --color-primary-active: #fdc190;
+    --color-primary-tint: rgba(251, 138, 60, 0.12);
+    --color-primary-ring: rgba(251, 138, 60, 0.22);
+    --color-primary-contrast: #17181d;
+
+    --color-success: #4ade80;
+    --color-success-bg: rgba(74, 222, 128, 0.12);
+    --color-danger: #f87171;
+    --color-danger-bg: rgba(248, 113, 113, 0.12);
+    --color-muted-bg: #1d1f25;
+
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* The toggle's explicit choice — wins in both directions regardless of OS setting. */
+:root[data-theme="dark"] {
+  --color-bg: #101114;
+  --color-surface: #17181d;
+  --color-surface-hover: #1d1f25;
+  --color-border: #292b32;
+  --color-border-strong: #383a43;
+  --color-text: #f1f2f4;
+  --color-text-muted: #9aa0ab;
+  --color-text-faint: #6b7280;
+
+  --color-primary: #fb8a3c;
+  --color-primary-hover: #fda766;
+  --color-primary-active: #fdc190;
+  --color-primary-tint: rgba(251, 138, 60, 0.12);
+  --color-primary-ring: rgba(251, 138, 60, 0.22);
+  --color-primary-contrast: #17181d;
+
+  --color-success: #4ade80;
+  --color-success-bg: rgba(74, 222, 128, 0.12);
+  --color-danger: #f87171;
+  --color-danger-bg: rgba(248, 113, 113, 0.12);
+  --color-muted-bg: #1d1f25;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.55);
 }
 
 * {
@@ -32,9 +119,26 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-sans);
   background: var(--color-bg);
   color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  background: var(--color-primary-tint);
+  color: var(--color-primary-active);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .app {
@@ -46,23 +150,35 @@ body {
 /* ---------- Header ---------- */
 
 .header {
-  background: var(--color-surface);
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
 }
 
 .header__inner {
-  max-width: 960px;
+  max-width: 1140px;
   margin: 0 auto;
-  padding: 16px 24px;
+  padding: 14px 24px;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 12px;
 }
 
 .header__logo {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 19px;
+  font-weight: 800;
   letter-spacing: -0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.header__logo-icon {
+  color: var(--color-primary);
 }
 
 .header__logo-accent {
@@ -70,7 +186,7 @@ body {
 }
 
 .header__tagline {
-  color: var(--color-text-muted);
+  color: var(--color-text-faint);
   font-size: 13px;
   flex: 1;
 }
@@ -78,7 +194,7 @@ body {
 .header__auth {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .header__user {
@@ -100,6 +216,30 @@ body {
   padding: 2px 8px;
 }
 
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color 0.15s var(--ease), border-color 0.15s var(--ease), background 0.15s var(--ease), transform 0.1s var(--ease);
+}
+
+.theme-toggle:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: var(--color-primary-tint);
+}
+
+.theme-toggle:active {
+  transform: scale(0.92);
+}
+
 /* ---------- Layout ---------- */
 
 .app__main {
@@ -110,28 +250,50 @@ body {
   max-width: 1140px;
   width: 100%;
   margin: 0 auto;
-  padding: 48px 24px 80px;
+  padding: 64px 24px 96px;
   display: flex;
   flex-direction: column;
-  gap: 48px;
+  gap: 56px;
 }
 
 /* ---------- Hero / shorten form ---------- */
 
 .hero {
   text-align: center;
+  position: relative;
+  /* Clips the glow below to this section rather than the whole page.
+     Clipping at html/body instead was tried first and looked right in a
+     desktop screenshot, but it broke .header's position:sticky — any
+     non-visible overflow on an ancestor of a sticky element can do that,
+     and html/body are ancestors of everything, header included. .hero
+     isn't an ancestor of .header (they're siblings under .app__main /
+     .app), so containing the overflow here has no such side effect. */
+  overflow: hidden;
+}
+
+.hero::before {
+  content: "";
+  position: absolute;
+  top: -80px;
+  left: 50%;
+  width: 640px;
+  height: 320px;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at center, var(--color-primary-tint) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: -1;
 }
 
 .hero__title {
-  font-size: 34px;
-  font-weight: 700;
-  margin: 0 0 8px;
-  letter-spacing: -0.02em;
+  font-size: clamp(30px, 4.4vw, 42px);
+  font-weight: 800;
+  margin: 0 0 10px;
+  letter-spacing: -0.03em;
 }
 
 .hero__subtitle {
   color: var(--color-text-muted);
-  margin: 0 0 28px;
+  margin: 0 0 32px;
   font-size: 15px;
 }
 
@@ -144,25 +306,37 @@ body {
 .shorten-form__main {
   display: flex;
   gap: 10px;
+  background: var(--color-surface);
+  padding: 6px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  transition: box-shadow 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.shorten-form__main:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md), 0 0 0 4px var(--color-primary-ring);
 }
 
 .shorten-form__input {
   flex: 1;
-  padding: 14px 20px;
+  padding: 12px 18px;
   font-size: 15px;
-  border: 1px solid var(--color-border);
+  font-family: inherit;
+  border: none;
   border-radius: var(--radius-pill);
-  background: var(--color-surface);
+  background: transparent;
+  color: var(--color-text);
   outline: none;
 }
 
-.shorten-form__input:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(238, 97, 35, 0.12);
+.shorten-form__input::placeholder {
+  color: var(--color-text-faint);
 }
 
 .shorten-form__advanced-toggle {
-  margin-top: 12px;
+  margin-top: 14px;
   background: none;
   border: none;
   color: var(--color-primary);
@@ -170,6 +344,7 @@ body {
   font-weight: 600;
   cursor: pointer;
   padding: 4px 0;
+  font-family: inherit;
 }
 
 .shorten-form__advanced-toggle:hover {
@@ -177,13 +352,15 @@ body {
 }
 
 .shorten-form__advanced {
-  margin-top: 12px;
+  margin-top: 14px;
   padding: 20px;
   background: var(--color-muted-bg);
-  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+  animation: reveal 0.18s var(--ease);
 }
 
 .field {
@@ -199,12 +376,23 @@ body {
 }
 
 .field input[type="text"],
+.field input[type="email"],
+.field input[type="password"],
 .field input[type="datetime-local"] {
-  padding: 9px 12px;
+  padding: 10px 13px;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 14px;
+  font-family: inherit;
   background: var(--color-surface);
+  color: var(--color-text);
+  outline: none;
+  transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+
+.field input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-ring);
 }
 
 .field--checkbox {
@@ -222,18 +410,25 @@ body {
   border: none;
   font-size: 15px;
   font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
   white-space: nowrap;
+  transition: background 0.15s var(--ease), border-color 0.15s var(--ease), color 0.15s var(--ease), transform 0.1s var(--ease);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .btn:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
 .btn--primary {
   background: var(--color-primary);
-  color: white;
+  color: var(--color-primary-contrast);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn--primary:hover:not(:disabled) {
@@ -250,6 +445,7 @@ body {
 
 .btn--ghost:hover:not(:disabled) {
   background: var(--color-muted-bg);
+  border-color: var(--color-border-strong);
 }
 
 .btn--danger-ghost {
@@ -258,13 +454,15 @@ body {
   color: var(--color-danger);
   font-size: 13px;
   font-weight: 600;
+  font-family: inherit;
   padding: 6px 10px;
   cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s var(--ease);
 }
 
 .btn--danger-ghost:hover:not(:disabled) {
   background: var(--color-danger-bg);
-  border-radius: 6px;
 }
 
 /*
@@ -279,18 +477,21 @@ body {
  * that class of bug structurally impossible.
  */
 .copy-btn {
-  padding: 6px 14px;
+  padding: 7px 14px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   color: var(--color-text);
   font-size: 13px;
   font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
+  transition: background 0.15s var(--ease), border-color 0.15s var(--ease);
 }
 
 .copy-btn:hover {
   background: var(--color-muted-bg);
+  border-color: var(--color-border-strong);
 }
 
 .copy-btn--inline {
@@ -302,7 +503,7 @@ body {
 .copy-btn--primary {
   border: none;
   background: var(--color-primary);
-  color: white;
+  color: var(--color-primary-contrast);
 }
 
 .copy-btn--primary:hover {
@@ -316,13 +517,14 @@ body {
   margin: 20px auto 0;
   padding: 18px 22px;
   background: var(--color-success-bg);
-  border: 1px solid rgba(22, 163, 74, 0.25);
-  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--color-success) 28%, transparent);
+  border-radius: var(--radius-md);
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
   text-align: left;
+  animation: reveal 0.22s var(--ease);
 }
 
 .result-card__info {
@@ -371,9 +573,9 @@ body {
 .links-section {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
-  padding: 24px;
+  padding: 26px;
 }
 
 .links-section__header {
@@ -382,12 +584,14 @@ body {
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
 .links-section__header h2 {
   font-size: 18px;
+  font-weight: 700;
   margin: 0;
+  letter-spacing: -0.01em;
 }
 
 .link-filters {
@@ -399,9 +603,18 @@ body {
 .link-filters select {
   padding: 8px 12px;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
+  font-family: inherit;
   background: var(--color-surface);
+  color: var(--color-text);
+  outline: none;
+  transition: border-color 0.15s var(--ease);
+}
+
+.link-filters__search:focus,
+.link-filters select:focus {
+  border-color: var(--color-primary);
 }
 
 .link-filters__search {
@@ -418,8 +631,10 @@ body {
 }
 
 .auth-panel__title {
-  font-size: 18px;
+  font-size: 19px;
+  font-weight: 700;
   margin: 0 0 6px;
+  letter-spacing: -0.01em;
 }
 
 .auth-panel__subtitle {
@@ -438,10 +653,6 @@ body {
 
 .auth-panel__form .field input {
   padding: 10px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-size: 14px;
-  background: var(--color-surface);
 }
 
 .auth-panel__form .btn {
@@ -455,6 +666,7 @@ body {
   color: var(--color-primary);
   font-size: 13px;
   font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
 }
 
@@ -486,20 +698,29 @@ body {
   text-align: left;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted);
+  letter-spacing: 0.05em;
+  color: var(--color-text-faint);
+  font-weight: 700;
   padding: 10px 12px;
   border-bottom: 1px solid var(--color-border);
 }
 
 .links-table td {
-  padding: 12px;
+  padding: 13px 12px;
   border-bottom: 1px solid var(--color-border);
   vertical-align: middle;
 }
 
+.links-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.link-row {
+  transition: background 0.12s var(--ease);
+}
+
 .link-row:hover {
-  background: var(--color-muted-bg);
+  background: var(--color-surface-hover);
 }
 
 .link-row--busy {
@@ -535,6 +756,7 @@ body {
 .link-row__clicks {
   font-weight: 700;
   text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .link-row__date {
@@ -550,20 +772,91 @@ body {
 }
 
 .links-table__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
   text-align: center;
-  padding: 48px 0;
-  color: var(--color-text-muted);
+  padding: 56px 0;
+  color: var(--color-text-faint);
+}
+
+.links-table__empty p {
+  margin: 0;
   font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+/* ---------- Skeleton (loading) rows ---------- */
+
+.link-row--skeleton td {
+  padding: 16px 12px;
+}
+
+.skeleton-bar {
+  display: block;
+  height: 16px;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--color-muted-bg) 25%, var(--color-border) 50%, var(--color-muted-bg) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.spinner {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2.5px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ---------- Badges ---------- */
 
 .badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 3px 10px;
   border-radius: var(--radius-pill);
   font-size: 12px;
   font-weight: 600;
+}
+
+.badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .badge--active {
@@ -599,10 +892,10 @@ body {
 .switch__track {
   position: absolute;
   inset: 0;
-  background: var(--color-border);
+  background: var(--color-border-strong);
   border-radius: var(--radius-pill);
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s var(--ease);
 }
 
 .switch__track::before {
@@ -612,10 +905,10 @@ body {
   height: 16px;
   left: 2px;
   top: 2px;
-  background: white;
+  background: var(--color-surface);
   border-radius: 50%;
-  transition: transform 0.15s ease;
-  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s var(--ease);
+  box-shadow: var(--shadow-xs);
 }
 
 .switch input:checked + .switch__track {
@@ -632,8 +925,8 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 16px;
-  padding-top: 16px;
+  margin-top: 18px;
+  padding-top: 18px;
   border-top: 1px solid var(--color-border);
 }
 
@@ -661,16 +954,28 @@ body {
 
 .toast {
   padding: 12px 18px;
-  border-radius: 8px;
-  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
   font-size: 14px;
   font-weight: 500;
   max-width: 360px;
+  animation: toast-in 0.2s var(--ease);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .toast--success {
   background: var(--color-text);
-  color: white;
+  color: var(--color-bg);
 }
 
 .toast--error {
@@ -681,8 +986,13 @@ body {
 /* ---------- Responsive ---------- */
 
 @media (max-width: 640px) {
+  .header__tagline {
+    display: none;
+  }
+
   .shorten-form__main {
     flex-direction: column;
+    border-radius: var(--radius-md);
   }
 
   .shorten-form__advanced {
@@ -700,5 +1010,14 @@ body {
 
   .link-filters__search {
     width: 100%;
+  }
+}
+
+/* Users who've asked the OS for less motion get it — no shimmer, no
+   entrance transitions, only the underlying state change. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
   }
 }

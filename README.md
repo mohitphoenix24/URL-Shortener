@@ -200,7 +200,8 @@ Built in phases, each one committed working end-to-end. See
       device/browser/os) on every redirect, `GET /api/v1/analytics/links/:id` for the aggregates
 - [x] Phase 5 — 144 tests (83 unit, 61 integration against real Testcontainers Postgres/Redis) +
       OpenAPI/Swagger UI at `/docs` + a runnable Postman collection
-- [ ] Phase 6 — Frontend polish pass (real design)
+- [x] Phase 6 — Frontend polish pass: token-driven design system (Inter, refined palette,
+      shadow/radius scale), light/dark theme with no flash-of-wrong-theme, skeleton loading state
 - [ ] Phase 7 — Docker & CI/CD
 - [ ] Phase 8 — Observability (Prometheus/Grafana) & deploy
 

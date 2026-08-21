@@ -3,7 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
     <title>URL Shortener</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      // Applies the saved/system theme before first paint, so there's no
+      // flash of the wrong theme while React (and its own theme hook) boots.
+      (function () {
+        try {
+          var saved = localStorage.getItem("theme");
+          var theme = saved || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+          document.documentElement.dataset.theme = theme;
+        } catch {
+          /* localStorage unavailable (private mode, etc.) — falls back to the CSS prefers-color-scheme default */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
