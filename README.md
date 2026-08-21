@@ -112,6 +112,13 @@ already gets for free:
 | `url_shortener_rate_limit_rejections_total` | `tier` (anon / auth / redirect) | Rate limiter pressure — `anon` rejections are the login brute-force protection working, not a problem |
 | `url_shortener_clicks_recorded_total` | `status` (success / error) | Click-capture failures, which are otherwise only visible in logs (see docs/decisions.md) |
 
+## Deploying
+
+`render.yaml` is a [Render](https://render.com) Blueprint — API, Postgres, Redis, and the static
+frontend, all from one file. Full walkthrough (secrets, the one manual migration step, and two
+things worth verifying after your first deploy rather than assuming) in
+[`DEPLOYMENT.md`](DEPLOYMENT.md).
+
 ## API quick reference
 
 ### Auth (Phase 2)
@@ -243,8 +250,8 @@ Built in phases, each one committed working end-to-end. See
 - [x] Phase 7 — Multi-stage Dockerfiles (backend: lean `runner` + separate `migrator` stage;
       frontend: nginx-served static build), `docker compose --profile full` for the whole stack,
       GitHub Actions CI (lint, unit + integration tests, both frontend and Docker builds)
-- [ ] Phase 8 — Observability (Prometheus/Grafana, auto-provisioned dashboard, business metrics) is
-      done; deploy is still pending a target
+- [x] Phase 8 — Observability (Prometheus/Grafana, auto-provisioned dashboard, business metrics) +
+      a Render Blueprint for deploy — see [`DEPLOYMENT.md`](DEPLOYMENT.md)
 
 ## License
 

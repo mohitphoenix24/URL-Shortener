@@ -1,0 +1,114 @@
+# Render Blueprint — see DEPLOYMENT.md for the full walkthrough (first-time
+# setup, the manual migration step, and what's still unconfirmed vs. Render's
+# docs). This file alone is not a "just works" one-click deploy: a handful of
+# `sync: false` secrets must be set in the Render dashboard after the first
+# blueprint sync, and migrations are run manually (see below for why) rather
+# than automatically on deploy.
+#
+# Plans are set to `starter` (paid), not `free`, on purpose: Render's free
+# Postgres is deleted 30 days after creation, which makes it unsuitable for
+# anything meant to stay up as a portfolio piece rather than a short-lived
+# demo. Free Key Value (Redis) has no such expiry and would actually work
+# fine given this app's fail-open design (a wiped cache/rate-limiter is
+# never a correctness problem here — see docs/decisions.md) — starter is
+# still the default below for consistency; switch `redis`'s plan to `free`
+# if you'd rather not pay for it.
+
+databases:
+  - name: url-shortener-db
+    databaseName: url_shortener
+    user: url_shortener
+    plan: starter
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: url-shortener-api
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    # Render builds a Dockerfile through to its LAST stage only — there's no
+    # equivalent of `docker build --target`, confirmed against Render's own
+    # docs. backend/Dockerfile's last stage is `runner` (the lean, prod-only
+    # image), which is exactly what should run here; the earlier `migrator`
+    # stage (used locally via docker-compose's `target: migrator`) simply
+    # isn't reachable this way on Render — see DEPLOYMENT.md's migrations
+    # section for the actual process instead of pretending this would work.
+    plan: starter
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "4500"
+      - key: LOG_LEVEL
+        value: info
+      # Render injects its own RENDER_EXTERNAL_URL into every web service
+      # with that service's own public URL — exactly what APP_BASE_URL
+      # means (see src/utils/mappers.js's toLinkDto, which builds shortUrl
+      # from it), so no hardcoded guess at the service's URL is needed here.
+      - key: APP_BASE_URL
+        fromService:
+          type: web
+          name: url-shortener-api
+          property: host
+      # Render's `fromDatabase`/`fromService` property values are hostnames
+      # or connection strings, never a full https:// URL — CORS_ORIGIN needs
+      # the scheme, so this is written to match url-shortener-web's expected
+      # onrender.com URL below rather than derived. If you rename the
+      # `url-shortener-web` service or attach a custom domain, update this
+      # to match — verify after first deploy, don't assume it's right.
+      - key: CORS_ORIGIN
+        value: https://url-shortener-web.onrender.com
+      - key: DATABASE_URL
+        fromDatabase:
+          name: url-shortener-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: url-shortener-redis
+          property: connectionString
+      # Everything below has no safe default and is never committed —
+      # `sync: false` means Render leaves it blank until you set the real
+      # value in the dashboard after the first blueprint sync. Generate each
+      # the same way backend/.env.example suggests:
+      #   node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: IP_HASH_SALT
+        sync: false
+
+  - type: keyvalue
+    name: url-shortener-redis
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
+  - type: web
+    name: url-shortener-web
+    runtime: static
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      # Vite bakes VITE_* vars into the built JS at build time (see
+      # frontend/src/api/client.js) — this must be set BEFORE buildCommand
+      # runs, not just available at runtime, for the deployed frontend to
+      # ever reach the right API. Render's docs don't explicitly confirm
+      # static-site envVars reach buildCommand the way they do for a web
+      # service's start command — verify this resolves correctly in the
+      # deployed bundle after the first build; if it doesn't, the fallback
+      # is hardcoding the value directly here instead of building on
+      # inference from thin documentation.
+      - key: VITE_API_BASE_URL
+        value: https://url-shortener-api.onrender.com
+    routes:
+      # SPA fallback — same reasoning as frontend/nginx.conf's try_files for
+      # the local Docker path: any path that isn't a real static asset
+      # should still resolve to index.html so a hard refresh on a client
+      # route doesn't 404 before React ever renders.
+      - type: rewrite
+        source: /*
+        destination: /index.html
