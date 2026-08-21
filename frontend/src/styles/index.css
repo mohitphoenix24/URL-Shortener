@@ -350,8 +350,14 @@ a {
    text did. The tinted, colored state now IS the resting state, not a
    hover-only reveal, so it's visible without any interaction at all. */
 .shorten-form__advanced-toggle {
-  margin-top: 14px;
-  display: inline-flex;
+  /* Centered under the (centered) Shorten button rather than pinned to
+     .shorten-form's left edge — .shorten-form itself stays text-align:left
+     (needed by the advanced-options fields' own labels/inputs below), so
+     this centers itself directly via margin:auto on a fit-content box
+     rather than relying on inherited text-align. */
+  display: flex;
+  width: fit-content;
+  margin: 14px auto 0;
   align-items: center;
   gap: 7px;
   background: var(--color-primary-tint);
