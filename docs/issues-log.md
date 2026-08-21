@@ -171,6 +171,26 @@ development but had no place on a live, deployed app.
 
 **Fix:** removed the line before considering the deploy finished.
 
+### 14. Users got logged out every time they refreshed the page
+
+Logging in worked, but reloading the browser afterward always asked to log
+in again — the session never survived a refresh. Cause: staying logged in
+after a refresh depends on a hidden cookie the browser sends automatically
+to silently restore the session. That cookie was set with a security rule
+("SameSite=Lax") that only allows it to be sent when the frontend and the
+API are on the same site. Locally they are (same site, different port),
+but once deployed, the frontend and API each live on their own separate
+`onrender.com` address — and Render deliberately registers its domain so
+that every customer's subdomain counts as a genuinely different site from
+every other one. So in production, the browser was silently refusing to
+send the cookie at all, and the "try to restore your session" request
+always failed.
+
+**Fix:** changed that cookie's rule to "SameSite=None" specifically when
+running in production (kept as "Lax" for local development, where it
+already worked fine). "None" requires the cookie to also be marked
+"Secure" (HTTPS-only), which was already the case in production.
+
 ---
 
 ## What this suggests going forward
