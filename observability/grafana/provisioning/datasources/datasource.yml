@@ -1,0 +1,22 @@
+# Auto-provisions the Prometheus datasource on Grafana startup — no manual
+# "add a datasource" click-through needed the first time this stack comes up.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    # Pinned explicitly (not left to Grafana's auto-generated default) —
+    # every panel in dashboards/url-shortener.json references this exact
+    # uid in its `datasource` field. Without a fixed uid here, Grafana
+    # assigns a random one on each provisioning run, which the dashboard's
+    # hardcoded reference then can't resolve — panels render as
+    # silently-empty rather than erroring, which is exactly what happened
+    # here before this was pinned; caught by actually loading the
+    # dashboard, not from the provisioning config alone.
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    # "prometheus" — the compose service name, reachable only from inside
+    # the compose network, same reasoning as prometheus.yml's own target.
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false

@@ -21,6 +21,7 @@ import { LINK_SORT_COLUMNS } from "../api/validators/link.validator.js";
 import { redis, REDIS_KEYS } from "../config/redis.js";
 import { env } from "../config/env.js";
 import { logger } from "../config/logger.js";
+import { cacheOperationsTotal } from "../config/metrics.js";
 
 const RANDOM_CODE_LENGTH = 8;
 const RANDOM_CODE_MAX_ATTEMPTS = 5;
@@ -105,8 +106,11 @@ function evaluateResolvedLink(link) {
 async function getCacheEntries(shortCode) {
   try {
     const [positive, negative] = await redis.mget(REDIS_KEYS.link(shortCode), REDIS_KEYS.linkNegative(shortCode));
+    const result = positive ? "hit" : negative !== null ? "negative_hit" : "miss";
+    cacheOperationsTotal.inc({ result });
     return { positive: positive ? JSON.parse(positive) : null, negative: negative !== null };
   } catch (err) {
+    cacheOperationsTotal.inc({ result: "error" });
     logger.error({ err, shortCode }, "Link cache read failed; falling back to Postgres");
     return { positive: null, negative: false };
   }

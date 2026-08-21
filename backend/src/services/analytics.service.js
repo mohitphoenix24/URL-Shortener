@@ -14,6 +14,7 @@ import { assertOwnerOrAdmin } from "./link.service.js";
 import { hashIp } from "../utils/hash.js";
 import { AppError } from "../utils/AppError.js";
 import { logger } from "../config/logger.js";
+import { clicksRecordedTotal } from "../config/metrics.js";
 
 const TOP_REFERRERS_LIMIT = 5;
 
@@ -50,7 +51,9 @@ export async function recordClick({ linkId, ip, referrer, userAgent, country }) 
       browser: browser.name ?? null,
       os: os.name ?? null,
     });
+    clicksRecordedTotal.inc({ status: "success" });
   } catch (err) {
+    clicksRecordedTotal.inc({ status: "error" });
     logger.error({ err, linkId }, "Click capture failed");
   }
 }

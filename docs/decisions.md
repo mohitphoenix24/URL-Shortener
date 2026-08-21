@@ -184,6 +184,28 @@ All three were invisible from reading the Dockerfile/compose YAML in isolation �
 as a real container failing to start or reporting unhealthy, confirmed by `docker logs` and
 `docker inspect --format '{{json .State.Health}}'`, not by inspection.
 
+## Observability: a pinned Grafana datasource uid, found by actually loading the dashboard
+
+`observability/grafana/dashboards/url-shortener.json` hardcodes `"datasource": {"type": "prometheus",
+"uid": "prometheus"}` in every panel — that's the normal way a provisioned dashboard references its
+datasource without a human picking it from a dropdown. The datasource provisioning YAML, though,
+didn't originally set an explicit `uid:` — Grafana generates a random one for an unpinned datasource
+on every provisioning run, which the dashboard's hardcoded `"uid": "prometheus"` then can't resolve.
+
+The failure mode this produces is the worst kind: not an error, a *blank panel*. No red banner, no
+console error, no failed network request — Grafana just can't find the datasource for that panel and
+renders nothing. Reading the dashboard JSON or the datasource YAML in isolation, both looked correct;
+the mismatch only exists *between* them. Caught by actually logging into Grafana and looking at the
+dashboard (first with real traffic already generated) rather than trusting that "the file parsed" or
+"the container started" meant it worked — every panel was empty on the first real load. Fixed by
+adding `uid: prometheus` to `observability/grafana/provisioning/datasources/datasource.yml`, matching
+what the dashboard already hardcoded; re-verified with a fresh screenshot showing every panel
+populated (cache hit ratio, rate-limit rejections by tier, the works).
+
+The same "only running it end-to-end catches this" lesson as Phase 7's three Docker bugs — a
+provisioning config and a dashboard file can each be independently well-formed and still not agree
+with each other about an identifier, and nothing short of loading the actual page surfaces that.
+
 ## Hybrid JWT: stateless access token, stateful-revocable refresh token
 
 The roadmap frames "Stateful Sessions vs Stateless JWT" as a choice, but production systems that

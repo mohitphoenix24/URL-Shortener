@@ -123,6 +123,49 @@ services:
     depends_on:
       - api
 
+  # Scrapes GET /metrics on `api` every 15s (observability/prometheus/prometheus.yml).
+  # Depends on `api` being healthy so its first scrape isn't an immediate
+  # failure the moment this stack comes up cold.
+  prometheus:
+    profiles: ["full"]
+    image: prom/prometheus:v3.0.1
+    container_name: url-shortener-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9091:9090"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # Auto-provisioned on boot (observability/grafana/provisioning/) with the
+  # Prometheus datasource above and one dashboard — no manual setup click-
+  # through needed. Default login is admin/admin (dev-only, same spirit as
+  # postgres's plaintext dev password above — never used outside this local
+  # compose network).
+  grafana:
+    profiles: ["full"]
+    image: grafana/grafana:11.4.0
+    container_name: url-shortener-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      # One mount, not two: the dashboard JSON lives inside this same tree
+      # (provisioning/dashboards/url-shortener.json) — see that directory's
+      # dashboards.yml for why a second, nested mount doesn't work here.
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+
 volumes:
   pg_data:
   redis_data:
+  prometheus_data:
+  grafana_data:

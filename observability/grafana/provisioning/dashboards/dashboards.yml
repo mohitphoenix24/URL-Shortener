@@ -1,0 +1,19 @@
+# Points Grafana at a directory of dashboard JSON files to auto-load on
+# startup — the JSON lives right alongside this file (url-shortener.json),
+# so one bind mount (docker-compose.yml's `grafana` service, the whole
+# `observability/grafana/provisioning` tree, read-only) covers both this
+# config and the dashboard it points to. A second, nested mount just for
+# the dashboards directory was tried first and failed outright: Docker
+# can't create a new mountpoint inside a directory that's already been
+# bind-mounted read-only by an enclosing mount — caught directly, the
+# `grafana` container wouldn't even start.
+apiVersion: 1
+
+providers:
+  - name: url-shortener
+    folder: ""
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/provisioning/dashboards

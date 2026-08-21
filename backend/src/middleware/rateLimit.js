@@ -11,6 +11,7 @@
 import { redis, REDIS_KEYS } from "../config/redis.js";
 import { env } from "../config/env.js";
 import { logger } from "../config/logger.js";
+import { rateLimitRejectionsTotal } from "../config/metrics.js";
 import { AppError } from "../utils/AppError.js";
 
 /** @param {import('express').Request} req @returns {string} */
@@ -22,13 +23,15 @@ function clientIp(req) {
  * Builds an Express middleware backed by one token-bucket tier.
  *
  * @param {object} params
+ * @param {string} params.tier - Label for `url_shortener_rate_limit_rejections_total` — purely a
+ *   metrics identifier, has no effect on bucket behavior.
  * @param {number} params.capacity - Max tokens (i.e. the burst size).
  * @param {number} params.refillPerSec - Tokens added per second (the sustained rate).
  * @param {(req: import('express').Request) => string} params.keyFn - Derives the bucket's
  *   identity from the request (e.g. by IP or by user id) — separate identities get separate buckets.
  * @returns {import('express').RequestHandler}
  */
-export function rateLimiter({ capacity, refillPerSec, keyFn }) {
+export function rateLimiter({ tier, capacity, refillPerSec, keyFn }) {
   return async function rateLimit(req, res, next) {
     const key = REDIS_KEYS.rateLimit(keyFn(req));
 
@@ -45,6 +48,7 @@ export function rateLimiter({ capacity, refillPerSec, keyFn }) {
 
     const [allowed, , retryAfterMs] = result;
     if (!allowed) {
+      rateLimitRejectionsTotal.inc({ tier });
       res.setHeader("Retry-After", Math.ceil(retryAfterMs / 1000));
       return next(AppError.tooManyRequests("Too many requests — please slow down", "RATE_LIMITED"));
     }
@@ -58,6 +62,7 @@ export function rateLimiter({ capacity, refillPerSec, keyFn }) {
  * brute-force protection" note) and anonymous link creation.
  */
 export const rateLimitAnonByIp = rateLimiter({
+  tier: "anon",
   capacity: env.RATE_LIMIT_ANON_CAPACITY,
   refillPerSec: env.RATE_LIMIT_ANON_REFILL_PER_SEC,
   keyFn: (req) => `anon:${clientIp(req)}`,
@@ -65,6 +70,7 @@ export const rateLimitAnonByIp = rateLimiter({
 
 /** For authenticated traffic, keyed by user id: every requireAuth-gated links route, `/auth/me`. */
 export const rateLimitAuthByUser = rateLimiter({
+  tier: "auth",
   capacity: env.RATE_LIMIT_AUTH_CAPACITY,
   refillPerSec: env.RATE_LIMIT_AUTH_REFILL_PER_SEC,
   keyFn: (req) => `user:${req.user.id}`,
@@ -76,6 +82,7 @@ export const rateLimitAuthByUser = rateLimiter({
  * route is hit on every click on every shared link, by design, not abuse.
  */
 export const rateLimitRedirect = rateLimiter({
+  tier: "redirect",
   capacity: env.RATE_LIMIT_REDIRECT_CAPACITY,
   refillPerSec: env.RATE_LIMIT_REDIRECT_REFILL_PER_SEC,
   keyFn: (req) => `redirect:${clientIp(req)}`,

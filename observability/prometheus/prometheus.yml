@@ -1,0 +1,19 @@
+# Scrapes the API's own /metrics — prom-client's default registry (process
+# stats, GC, event loop lag) plus this app's own counters/histograms from
+# src/config/metrics.js. 15s is Prometheus's own default; kept explicit here
+# rather than relied on, since "what's the actual scrape interval" is
+# exactly the kind of thing worth being able to answer by reading this file
+# alone, not by knowing Prometheus's defaults from memory.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: url-shortener-api
+    metrics_path: /metrics
+    static_configs:
+      # "api" is the Docker Compose service name — reachable at that
+      # hostname only from inside the compose network, which is exactly
+      # where this Prometheus container runs. See docker-compose.yml's
+      # `prometheus` service.
+      - targets: ["api:4500"]

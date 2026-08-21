@@ -87,9 +87,30 @@ docker compose --profile full up --build
 
 `docker compose up -d` (no profile, the command above) starts only Postgres + Redis — that's what
 the host `npm run dev` workflow above expects. `--profile full` additionally builds and runs the API
-(`backend/Dockerfile`, migrations applied by a one-shot `migrate` service first) and the frontend
-(`frontend/Dockerfile`, a static build served by nginx), on the same ports as the host workflow
-(4500, 5175) — the two are alternatives, not meant to run at the same time.
+(`backend/Dockerfile`, migrations applied by a one-shot `migrate` service first), the frontend
+(`frontend/Dockerfile`, a static build served by nginx), and observability (below) — same ports as
+the host workflow (4500, 5175), so the two are alternatives, not meant to run at the same time.
+
+## Observability (Phase 8)
+
+`--profile full` (above) also brings up Prometheus and Grafana, auto-provisioned — no manual
+datasource/dashboard setup:
+
+- **Prometheus** → http://localhost:9091, scraping the API's `GET /metrics` every 15s
+  (`observability/prometheus/prometheus.yml`)
+- **Grafana** → http://localhost:3001 (login `admin` / `admin`, dev-only default) — the "URL
+  Shortener" dashboard is already there: request rate & p95 latency by route, 5xx error rate, cache
+  hit ratio, rate-limit rejections by tier, cache operations by result, click-capture outcomes,
+  process memory, and event-loop lag
+
+Business metrics (`src/config/metrics.js`) beyond the generic per-route HTTP histogram every route
+already gets for free:
+
+| Metric | Labels | What it's for |
+|---|---|---|
+| `url_shortener_cache_operations_total` | `result` (hit / negative_hit / miss / error) | Redirect cache-aside hit ratio |
+| `url_shortener_rate_limit_rejections_total` | `tier` (anon / auth / redirect) | Rate limiter pressure — `anon` rejections are the login brute-force protection working, not a problem |
+| `url_shortener_clicks_recorded_total` | `status` (success / error) | Click-capture failures, which are otherwise only visible in logs (see docs/decisions.md) |
 
 ## API quick reference
 
@@ -222,7 +243,8 @@ Built in phases, each one committed working end-to-end. See
 - [x] Phase 7 — Multi-stage Dockerfiles (backend: lean `runner` + separate `migrator` stage;
       frontend: nginx-served static build), `docker compose --profile full` for the whole stack,
       GitHub Actions CI (lint, unit + integration tests, both frontend and Docker builds)
-- [ ] Phase 8 — Observability (Prometheus/Grafana) & deploy
+- [ ] Phase 8 — Observability (Prometheus/Grafana, auto-provisioned dashboard, business metrics) is
+      done; deploy is still pending a target
 
 ## License
 
