@@ -38,13 +38,19 @@ function isUniqueViolation(err) {
  * owned by someone else — only an admin can manage it. This single rule is
  * what "links scoped to owner" means in practice everywhere below.
  *
+ * Exported (not module-private) because `services/analytics.service.js`
+ * applies the identical rule to reading a link's click analytics — "who can
+ * touch this link" and "who can see this link's stats" are the same
+ * question, so they share one implementation rather than two copies that
+ * could drift apart.
+ *
  * @param {object} linkRow - Raw `links` table row.
  * @param {{id: string, role: string}} user - The authenticated caller (always present — every
  *   route that calls this runs behind `requireAuth`).
  * @returns {void}
  * @throws {AppError} 403 if the caller isn't the owner or an admin.
  */
-function assertOwnerOrAdmin(linkRow, user) {
+export function assertOwnerOrAdmin(linkRow, user) {
   if (user.role === "admin") return;
   if (linkRow.user_id !== null && String(linkRow.user_id) === String(user.id)) return;
   throw AppError.forbidden("You do not have permission to access this link", "LINK_FORBIDDEN");

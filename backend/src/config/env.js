@@ -44,6 +44,15 @@ const envSchema = z.object({
 
   LINK_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
   LINK_NEGATIVE_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60),
+
+  // Salts the IP hash click analytics stores (see utils/hash.js). Without a
+  // secret salt, SHA-256(ip) would be reversible by brute force — IPv4 is
+  // only ~4 billion values, trivial to rainbow-table — which would make
+  // "we don't store raw IPs" a privacy claim in name only.
+  IP_HASH_SALT: z.string().min(16, "IP_HASH_SALT must be at least 16 characters"),
+
+  ANALYTICS_DEFAULT_RANGE_DAYS: z.coerce.number().int().positive().default(30),
+  ANALYTICS_MAX_RANGE_DAYS: z.coerce.number().int().positive().default(365),
 });
 
 const parsed = envSchema.safeParse(process.env);

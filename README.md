@@ -122,6 +122,16 @@ curl -XPATCH localhost:4500/api/v1/links/14776336 -H "Authorization: Bearer $ACC
 curl -XDELETE localhost:4500/api/v1/links/14776336 -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
+### Analytics (Phase 4)
+
+Owner-scoped identically to the links resource — 403 for anyone but the link's owner or an admin.
+Click capture itself isn't a separate call: every `GET /:code` redirect records one, fire-and-forget,
+with no effect on redirect latency.
+
+```bash
+curl "localhost:4500/api/v1/analytics/links/14776336?days=30" -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
 ## Frontend (basic UI, functional test harness)
 
 Bitly-style: one hero input to shorten a URL, a result card with copy-to-clipboard, and a
@@ -166,7 +176,8 @@ Built in phases, each one committed working end-to-end. See
       session persistence across reload
 - [x] Phase 3 — Redis cache-aside on the redirect hot path + hand-written token-bucket rate limiter
       (Lua script, three tiers: anon/auth/redirect), doubling as login brute-force protection
-- [ ] Phase 4 — Click analytics
+- [x] Phase 4 — Click analytics: fire-and-forget capture (IP hashed with a secret salt, UA-parsed
+      device/browser/os) on every redirect, `GET /api/v1/analytics/links/:id` for the aggregates
 - [ ] Phase 5 — Tests & API docs (OpenAPI/Swagger, Postman)
 - [ ] Phase 6 — Frontend polish pass (real design)
 - [ ] Phase 7 — Docker & CI/CD

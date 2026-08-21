@@ -111,6 +111,53 @@ computed `Retry-After` header, in seconds) for the rest.
 Like the cache, this fails open — a Redis error is logged and the request is allowed through rather
 than the whole API going down because rate limiting couldn't be evaluated.
 
+## Click analytics (Phase 4)
+
+Capture and read are two different concerns with two different reliability requirements, and the
+design treats them that way:
+
+```
+GET /:code  (redirect.controller.js)
+  1. resolveLink(code)         — as above, cache-aside
+  2. res.redirect(302, longUrl) — response sent, request is "done" from the client's perspective
+  3. recordClick(...)          — fired, NOT awaited; catches its own errors internally
+```
+
+`recordClick` (`services/analytics.service.js`) parses the `User-Agent` header with `ua-parser-js`
+into device type/browser/os, hashes the IP (`utils/hash.js#hashIp`), and writes one `clicks` row —
+see `repositories/click.repository.js#recordClick`, which inserts the row and increments
+`links.click_count` in the same short-lived transaction, so the denormalized counter can never drift
+from `COUNT(*) FROM clicks WHERE link_id = ...`. Because step 3 isn't awaited by the controller and
+catches its own errors, nothing about analytics capture can add latency to or fail a redirect — this
+was a deliberate design choice (`docs/decisions.md`'s "No message broker for click analytics"), not
+an accident of using `res.redirect()` before the write.
+
+**IP hashing, not raw storage.** `clicks.ip_hash` is `HMAC-SHA256(IP_HASH_SALT, ip)`, not a bare
+`SHA-256(ip)`. An IPv4 address is only ~4 billion possible values — a bare hash would be trivially
+reversible by brute force or a precomputed table, which would make "we don't store raw IPs" a
+privacy claim in name only. Keying with a deployment-secret salt closes that while staying
+deterministic per IP, which is what makes `COUNT(DISTINCT ip_hash)` a meaningful "unique visitors"
+figure at all — a random salt per row would defeat the hash's only purpose.
+
+**`GET /api/v1/analytics/links/:id?days=<n>`** (`services/analytics.service.js#getLinkAnalytics`,
+owner-or-admin-scoped via the same `assertOwnerOrAdmin` rule `link.service.js` uses for the link
+itself) runs five aggregate queries over the requested window in parallel (`Promise.all`, not
+sequential awaits — they're independent reads with no shared state):
+
+- `getClickStats` — total clicks and `COUNT(DISTINCT ip_hash)` unique visitors, one query so both
+  numbers are consistent with each other (same `WHERE`, same instant)
+- `getClicksByDay` — daily time series (`date_trunc('day', clicked_at)`), oldest first
+- `getTopReferrers` — busiest first, with `COALESCE(referrer, 'direct')` so a click with no
+  `Referer` header groups into its own labelled bucket instead of vanishing from the `GROUP BY`
+- `getBreakdown`, called three times (`device_type`, `browser`, `os`) — a shared query shape with
+  the column interpolated directly, safe here only because every call site passes one of three
+  fixed literals baked into the code, never a value that originates from request input (unlike
+  `parseSort`'s whitelist, which exists precisely because *its* input does come from the client)
+
+All five share one `now() - make_interval(days => $2::int)` window boundary, computed the same way
+in every query rather than passed in as a precomputed timestamp from the application — keeps "what
+counts as within range" defined once, in SQL, consistently across all five.
+
 ## Route ordering: why `GET /:code` is mounted last
 
 `GET /:code` matches *any* single path segment — that includes `/healthz`, `/metrics`, `/api`, etc.
