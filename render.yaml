@@ -44,15 +44,19 @@ services:
         value: "4500"
       - key: LOG_LEVEL
         value: info
-      # No explicit APP_BASE_URL here on purpose: Render injects its own
-      # RENDER_EXTERNAL_URL (a full https:// URL) into every web service,
-      # and backend/src/config/env.js falls back to it when APP_BASE_URL
-      # isn't set. An earlier version tried fromService/property:"host"
-      # here, but that resolves to a bare hostname with no scheme
-      # (e.g. "url-shortener-api-w46w.onrender.com"), which fails the
-      # z.string().url() validation in env.js — confirmed by the actual
-      # deploy failing with "APP_BASE_URL: Invalid url".
-      #
+      # Hardcoded, not derived: two earlier approaches both failed against
+      # the actual deploy. fromService/property:"host" gives a bare
+      # hostname with no scheme, which fails env.js's z.string().url()
+      # check ("Invalid url"). Falling back to Render's documented
+      # RENDER_EXTERNAL_URL inside env.js also left APP_BASE_URL unset
+      # ("Required") — that variable apparently isn't reaching this
+      # Docker-runtime service the way Render's docs describe for other
+      # runtimes, unconfirmed why. This exact value is this service's real
+      # onrender.com URL, checked directly in the Render dashboard after
+      # deploy — if you rename this service or attach a custom domain,
+      # update this to match, or the API will crash-loop on boot again.
+      - key: APP_BASE_URL
+        value: https://url-shortener-api-w46w.onrender.com
       # Render's `fromDatabase`/`fromService` property values are hostnames
       # or connection strings, never a full https:// URL — CORS_ORIGIN needs
       # the scheme, so this is written to match url-shortener-web's expected
