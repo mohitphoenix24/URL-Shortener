@@ -112,4 +112,28 @@ describe("GET /:code", () => {
     expect(hit.status).toBe(302);
     expect(hit.headers.location).toBe("https://example.com/just-created");
   });
+
+  it("a browser prefetch (Sec-Purpose: prefetch) still redirects but is not counted as a click", async () => {
+    // Reproduces a real bug: Chrome's address-bar "Preload pages" fetches a
+    // pasted/typed URL speculatively before Enter is pressed, then fetches
+    // it again for the real navigation — two genuine, identical requests
+    // for one visible click, each incrementing click_count. Browsers that do
+    // this mark the speculative request with Sec-Purpose so a server can
+    // tell them apart.
+    const { accessToken } = await registerUser(app);
+    const created = await request(app).post("/api/v1/links").set("Authorization", `Bearer ${accessToken}`).send({ longUrl: "https://example.com/prefetch-target" });
+    const shortCode = created.body.data.shortCode;
+
+    const prefetch = await request(app).get(`/${shortCode}`).set("Sec-Purpose", "prefetch");
+    expect(prefetch.status).toBe(302); // still redirects correctly — just not counted
+    expect(prefetch.headers.location).toBe("https://example.com/prefetch-target");
+
+    const real = await request(app).get(`/${shortCode}`);
+    expect(real.status).toBe(302);
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    const link = await request(app).get(`/api/v1/links/${created.body.data.id}`).set("Authorization", `Bearer ${accessToken}`);
+    expect(link.body.data.clickCount).toBe(1);
+  });
 });
