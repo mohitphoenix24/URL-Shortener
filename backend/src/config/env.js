@@ -19,6 +19,15 @@ const durationString = z
   .string()
   .regex(/^\d+[smhd]$/, "expected a duration like '15m', '7d', '30s'");
 
+// Render auto-injects RENDER_EXTERNAL_URL (a full https:// URL) into every
+// web service — exactly what APP_BASE_URL means (see utils/mappers.js's
+// toLinkDto). Only fall back to it when APP_BASE_URL isn't explicitly set,
+// so local dev (which sets APP_BASE_URL in .env, no RENDER_EXTERNAL_URL)
+// is unaffected.
+if (!process.env.APP_BASE_URL && process.env.RENDER_EXTERNAL_URL) {
+  process.env.APP_BASE_URL = process.env.RENDER_EXTERNAL_URL;
+}
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(4500),

@@ -44,15 +44,15 @@ services:
         value: "4500"
       - key: LOG_LEVEL
         value: info
-      # Render injects its own RENDER_EXTERNAL_URL into every web service
-      # with that service's own public URL — exactly what APP_BASE_URL
-      # means (see src/utils/mappers.js's toLinkDto, which builds shortUrl
-      # from it), so no hardcoded guess at the service's URL is needed here.
-      - key: APP_BASE_URL
-        fromService:
-          type: web
-          name: url-shortener-api
-          property: host
+      # No explicit APP_BASE_URL here on purpose: Render injects its own
+      # RENDER_EXTERNAL_URL (a full https:// URL) into every web service,
+      # and backend/src/config/env.js falls back to it when APP_BASE_URL
+      # isn't set. An earlier version tried fromService/property:"host"
+      # here, but that resolves to a bare hostname with no scheme
+      # (e.g. "url-shortener-api-w46w.onrender.com"), which fails the
+      # z.string().url() validation in env.js — confirmed by the actual
+      # deploy failing with "APP_BASE_URL: Invalid url".
+      #
       # Render's `fromDatabase`/`fromService` property values are hostnames
       # or connection strings, never a full https:// URL — CORS_ORIGIN needs
       # the scheme, so this is written to match url-shortener-web's expected
@@ -103,8 +103,14 @@ services:
       # deployed bundle after the first build; if it doesn't, the fallback
       # is hardcoding the value directly here instead of building on
       # inference from thin documentation.
+      #
+      # NOT "url-shortener-api.onrender.com" — that name was already taken
+      # by another Render account, so this deploy's API got a random suffix
+      # instead (url-shortener-api-w46w.onrender.com). Check the API
+      # service's actual URL in the Render dashboard and update this (and
+      # CORS_ORIGIN below on the API service) to match if yours differs.
       - key: VITE_API_BASE_URL
-        value: https://url-shortener-api.onrender.com
+        value: https://url-shortener-api-w46w.onrender.com
     routes:
       # SPA fallback — same reasoning as frontend/nginx.conf's try_files for
       # the local Docker path: any path that isn't a real static asset
